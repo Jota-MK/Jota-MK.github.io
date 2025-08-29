@@ -24,7 +24,7 @@ repository     : # "<your-github-username>/<your-repo-name>"
 # Site Author (sidebar)
 # =========================
 author:
-  avatar   : "profile.png"        # place a square headshot at /images/profile.png or /assets/images/profile.png
+  avatar   : "profile - pic.png"        # place a square headshot at /images/profile.png or /assets/images/profile.png
   name     : "João Kling"
   pronouns :                       # optional
   bio      : "Master’s student in Economics at EPGE/FGV; PhD aspirant Economics."
