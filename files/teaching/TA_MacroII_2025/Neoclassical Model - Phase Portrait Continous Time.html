@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>RCK (continuous) — Phase (k,c) • Pin Steady + Jump-to-Stable on Toggle (no series reset)</title>
+  <style>
+    :root{
+      /* Graphics palette (from you): #173F5F, #20639B, #3CAEA3, #F6D55C, #ED553B */
+      --bg:#ffffff; --panel:#f8fafc; --ink:#173F5F; --muted:#5b7a99; --grid:#e2e8f0; --axis:#173F5F;
+      --kdot0:#ED553B;   /* k̇ = 0 */
+      --cdot0:#20639B;   /* ċ = 0 (k = k*) */
+      --saddle:#3CAEA3;  /* stable manifold */
+      --traj:#173F5F;    /* trajectory */
+      --arrow:#20639B;   /* arrows */
+      --shock:#F6D55C;   /* shock marker + stable refs in TS */
+      --dot:#173F5F;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{margin:0; font:14px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Noto Sans,"Helvetica Neue",Arial; color:var(--ink); background:var(--bg)}
+    .shell{display:grid; grid-template-columns: 380px 1fr; gap:16px; height:100%; padding:14px}
+    .panel{background:var(--panel); border:1px solid #e5e7eb; border-radius:14px; padding:12px 14px 16px; overflow:auto}
+    h1{font-size:18px; margin:0 0 6px}
+    h2{font-size:14px; margin:14px 0 6px; color:var(--muted); font-weight:700}
+    .row{display:grid; grid-template-columns: 1fr auto; align-items:center; gap:8px; margin:6px 0}
+    .kbd{font:12px/1.2 ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace; color:#1f2937}
+    button{background:#ffffff; color:var(--ink); border:1px solid #e5e7eb; padding:6px 8px; border-radius:10px; outline:none; cursor:pointer}
+    button:hover{background:#f1f5f9}
+
+    .plot-wrap{position:relative}
+    .legend{position:absolute; right:12px; top:12px; background:#ffffffcc; border:1px solid #e5e7eb; border-radius:10px; padding:8px 10px; font-size:12px; backdrop-filter:saturate(180%) blur(2px)}
+    .legend .item{display:flex; align-items:center; gap:8px; margin:3px 0}
+    .sw{width:16px; height:3px; border-radius:3px}
+    .sw-dash{width:16px; height:0; border-top:3px dashed var(--traj)}
+    .sw-shock{width:16px; height:0; border-top:3px solid var(--shock)}
+
+    .course{margin:6px 0 10px; padding:8px 10px; border:1px solid #e5e7eb; border-radius:10px; background:#fff; font-size:12px}
+    .params-inline{display:flex; flex-wrap:wrap; gap:10px; align-items:center; font:13px/1.2 ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace}
+    .params-inline .tag{color:#334155}
+    .bigA{margin-top:8px; padding:10px 12px; border:1px dashed #bae6fd; background:#f0f9ff; border-radius:12px; font-size:14px}
+    .bigA .val{font-size:20px; font-weight:700; color:#20639B;}
+
+    .ts-wrap{margin-top:10px}
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <aside class="panel" id="controls">
+      <h1>RCK — Phase Diagram (k, c)</h1>
+      <div class="course"><strong>Macroeconomic Theory II (EPGE‑FGV)</strong> — Professor: Felipe S. Iachan • TA: João Kling • <strong>2025</strong></div>
+      <div class="kbd">Continuous time; CRRA; Cobb–Douglas; variables per effective worker. Axes fixed: k∈[0,10], c∈[0,2.3].</div>
+
+      <h2>Parameters</h2>
+      <div class="params-inline">
+        <span class="tag">Fixed:</span>
+        <span>α = 0.33</span>
+        <span>δ = 0.05</span>
+        <span>n = 0.01</span>
+        <span>g = 0.02</span>
+        <span>ρ = 0.04</span>
+        <span>θ = 1.5</span>
+      </div>
+      <div class="bigA">Current TFP <span class="val" id="pA"></span> <span id="aTag" class="kbd"></span></div>
+
+      <h2>Simulation</h2>
+      <div class="row" style="grid-template-columns: 1fr 1fr 1fr; gap:6px">
+        <button id="run">▶︎ Run</button>
+        <button id="pause">⏸ Pause</button>
+        <button id="reset">↺ Clear</button>
+      </div>
+
+      <h2>Markers</h2>
+      <div class="row" style="grid-template-columns: 1fr auto">
+        <div>Pin to the <em>steady state</em> & make the blue dot jump there</div>
+        <button id="pinSteady">Pin steady</button>
+      </div>
+
+      <h2>Toggle State</h2>
+      <div class="row" style="grid-template-columns: 1fr auto">
+        <div>Switch A ↔ A₂ = 1.15×A; if pinned, jump to the <strong>stable manifold</strong> at the same k</div>
+        <button id="toggleShock">Toggle</button>
+      </div>
+
+      <h2>Notable points</h2>
+      <div class="kbd">k*: <span id="kstar">–</span> • c*: <span id="cstar">–</span> • y(k*): <span id="ystar">–</span> • stable λ: <span id="lamstab">–</span></div>
+    </aside>
+
+    <main class="panel plot-wrap">
+      <svg id="plot" viewBox="0 0 900 640" width="100%" height="100%" aria-label="Phase diagram k-c" role="img"></svg>
+      <div class="legend" id="legend">
+        <div class="item"><span class="sw" style="background:var(--kdot0)"></span> k̇ = 0</div>
+        <div class="item"><span class="sw" style="background:var(--cdot0)"></span> ċ = 0 : k = k*</div>
+        <div class="item"><span class="sw" style="background:var(--saddle)"></span> Stable manifold (shown for k ∈ [2, 7])</div>
+        <div class="item"><span class="sw-dash"></span> Trajectory (dashed)</div>
+        <div class="item"><span class="sw" style="background:var(--arrow)"></span> Arrows + warm heatmap (faded)</div>
+        <div class="item"><span class="sw-shock"></span> Shock markers on time series</div>
+      </div>
+
+      <div class="ts-wrap">
+        <svg id="timeseries" viewBox="0 0 900 180" width="100%" height="180" aria-label="Time series k(t), c(t)"></svg>
+      </div>
+    </main>
+  </div>
+
+<script>
+(function(){
+  // ---------------- Baseline parameters ----------------
+  const BASE = Object.freeze({ A:1.0, alpha:0.33, delta:0.05, n:0.01, g:0.02, rho:0.04, theta:1.5 });
+  const SHOCK_FACTOR = 1.15;
+  let currentA = BASE.A; // toggles between A and A2
+
+  function setAText(){ document.getElementById('pA').textContent = currentA.toFixed(3); document.getElementById('aTag').textContent = (currentA===BASE.A? '(A)':'(A₂)'); }
+
+  // ---------------- Fixed domain ----------------
+  const KMAX=10.0, CMAX=2.3;
+
+  // ---------------- Utilities ----------------
+  const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
+  function rk4(step, state, deriv){
+    const k1 = deriv(state);
+    const s2 = {k: state.k + 0.5*step*k1.k, c: state.c + 0.5*step*k1.c};
+    const k2 = deriv(s2);
+    const s3 = {k: state.k + 0.5*step*k2.k, c: state.c + 0.5*step*k2.c};
+    const k3 = deriv(s3);
+    const s4 = {k: state.k + step*k3.k, c: state.c + step*k3.c};
+    const k4 = deriv(s4);
+    return { k: state.k + (step/6)*(k1.k + 2*k2.k + 2*k3.k + k4.k), c: state.c + (step/6)*(k1.c + 2*k2.c + 2*k3.c + k4.c) };
+  }
+
+  // ---------------- RCK model (A variable) ----------------
+  function fA(k, A){ return A * Math.pow(Math.max(k,0), BASE.alpha); }
+  function fpA(k, A){ if(k<=0) return Infinity; return A * BASE.alpha * Math.pow(k, BASE.alpha-1); }
+  function fppA(k, A){ if(k<=0) return -Infinity; return A * BASE.alpha*(BASE.alpha-1) * Math.pow(k, BASE.alpha-2); }
+  function ngd(){ return BASE.n + BASE.g + BASE.delta; }
+  function k_star_A(A){ const tar=BASE.rho+ngd(); const num=A*BASE.alpha; const pow=1/(1-BASE.alpha); return Math.pow(num/tar, pow); }
+  function c_star_A(A){ const ks=k_star_A(A); return Math.max(0, fA(ks,A) - ngd()*ks); }
+
+  function derivA(state, A){
+    if(!state || typeof state.k!=="number" || typeof state.c!=="number") return {k:0,c:0};
+    const kk=Math.max(state.k,0), cc=Math.max(state.c,0);
+    const dk = fA(kk,A) - cc - ngd()*kk;
+    const dc = (1/BASE.theta)*(fpA(kk,A) - ngd() - BASE.rho)*cc;
+    return {k:dk, c:dc};
+  }
+
+  function jacobianAtSteady(A){ const ks=k_star_A(A), cs=c_star_A(A); return { a11: BASE.rho, a12:-1, a21:(cs/BASE.theta)*fppA(ks,A), a22:0 }; }
+  function eigenStable(A){ const {a11,a12,a21,a22}=jacobianAtSteady(A); const tr=a11+a22, det=a11*a22 - a12*a21; const root=Math.sqrt(Math.max(0,tr*tr-4*det)); const l1=0.5*(tr+root), l2=0.5*(tr-root); const lambda=(l1<0? l1:l2); const v1=1, v2=(lambda-a11)/a12; const norm=Math.hypot(v1,v2)||1; return {lambda, vec:[v1/norm, v2/norm]}; }
+
+  // ------- Stable manifold via PHASE ODE: dc/dk = (ĉ)/(ḱ) (robust) -------
+  function slopePhase(A,k,c){ const d=derivA({k,c},A); const eps=1e-12; if(Math.abs(d.k)<eps) return null; return d.c/d.k; }
+  function manifoldPhase(A){
+    const ks=k_star_A(A), cs=c_star_A(A);
+    const kmin=0, kmax=KMAX; const h0=0.02; const maxSteps=20000;
+    function trace(dir){
+      const pts=[]; const eig=eigenStable(A); const slope0=eig.vec[1]/eig.vec[0];
+      let k=ks + (dir>0? +1:-1)*1e-5; let c=cs + (dir>0? +1:-1)*1e-5*slope0; let h=h0*dir;
+      for(let it=0; it<maxSteps; it++){
+        if(k<kmin-1e-6 || k>kmax+1e-6 || c<-1e-9 || c>CMAX+1e-9) break;
+        const s1=slopePhase(A,k,c); if(s1===null){ h*=0.5; if(Math.abs(h)<1e-6){ k+=h; break; } k+=h; continue; }
+        const k2=k+0.5*h, c2=c+0.5*h*s1; const s2=slopePhase(A,k2,c2); if(s2===null){ h*=0.5; continue; }
+        const k3=k+0.5*h, c3=c+0.5*h*s2; const s3=slopePhase(A,k3,c3); if(s3===null){ h*=0.5; continue; }
+        const k4=k+h,     c4=c+h*s3;     const s4=slopePhase(A,k4,c4); if(s4===null){ h*=0.5; continue; }
+        const cNext = c + (h/6)*(s1 + 2*s2 + 2*s3 + s4);
+        const kNext = k + h;
+        if(!(cNext>=-1e-9 && cNext<=CMAX+1e-9)){ h*=0.5; if(Math.abs(h)<1e-6) break; continue; }
+        k=kNext; c=cNext;
+        if(k>=2 && k<=7) pts.push({k, c:Math.max(0,Math.min(CMAX,c))});
+        if(Math.abs(h)<0.5*h0 && it%8===0) h*=1.2; // mild step recovery
+      }
+      return pts;
+    }
+    return {plus: trace(+1), minus: trace(-1), ks, cs};
+  }
+  // cache manifold
+  let cacheManifold = {A:null, data:null};
+  function getManifold(A){ if(cacheManifold.A!==A){ cacheManifold={A, data:manifoldPhase(A)}; } return cacheManifold.data; }
+
+  // Interpolate c on stable given k
+  function cOnStable(A, kTarget){
+    const man=getManifold(A); const all=[...man.minus, ...man.plus].sort((p,q)=>p.k-q.k);
+    if(!all.length) return null;
+    let lo=null, hi=null; for(let i=1;i<all.length;i++){ if(all[i-1].k<=kTarget && kTarget<=all[i].k){ lo=all[i-1]; hi=all[i]; break; } }
+    if(!lo||!hi){ const slope=eigenStable(A).vec[1]/eigenStable(A).vec[0]; return c_star_A(A) + slope*(kTarget - k_star_A(A)); }
+    const t=(kTarget-lo.k)/(hi.k-lo.k); return lo.c + t*(hi.c - lo.c);
+  }
+
+  // ---------------- SVG helpers ----------------
+  const svg=document.getElementById('plot');
+  const W=900, H=640, padL=70, padR=24, padT=20, padB=52;
+  function x(k){ return padL + (k/KMAX)*(W-padL-padR); }
+  function y(c){ return H - padB - (c/CMAX)*(H-padT-padB); }
+  function invx(X){ return ((X-padL)/(W-padL-padR))*KMAX; }
+  function invy(Y){ return ((H-padB-Y)/(H-padT-padB))*CMAX; }
+  function clearSVG(){ while(svg.lastChild) svg.removeChild(svg.lastChild); }
+  function addG(id){ const g=document.createElementNS('http://www.w3.org/2000/svg','g'); g.setAttribute('id',id); svg.appendChild(g); return g; }
+  function varGet(name){ return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+  function pathD(points){ return points.map((p,i)=> (i?'L':'M')+ ' ' + x(p.k) + ' ' + y(p.c)).join(' '); }
+
+  function gridAndAxes(){
+    const bg=document.createElementNS('http://www.w3.org/2000/svg','rect'); bg.setAttribute('x',0); bg.setAttribute('y',0); bg.setAttribute('width',W); bg.setAttribute('height',H); bg.setAttribute('fill','#ffffff'); svg.appendChild(bg);
+    const ticksK=10, ticksC=10;
+    for(let i=0;i<=ticksK;i++){
+      const kk=(i/ticksK)*KMAX; const X=x(kk);
+      const line=document.createElementNS('http://www.w3.org/2000/svg','line'); line.setAttribute('x1',X); line.setAttribute('y1',padT); line.setAttribute('x2',X); line.setAttribute('y2',H-padB); line.setAttribute('stroke',varGet('--grid')); svg.appendChild(line);
+      const lbl=document.createElementNS('http://www.w3.org/2000/svg','text'); lbl.setAttribute('x',X); lbl.setAttribute('y',H-22); lbl.setAttribute('fill',varGet('--muted')); lbl.setAttribute('font-size','12'); lbl.setAttribute('text-anchor','middle'); lbl.textContent=kk.toFixed(0); svg.appendChild(lbl);
+    }
+    for(let j=0;j<=ticksC;j++){
+      const cc=(j/ticksC)*CMAX; const Y=y(cc);
+      const line=document.createElementNS('http://www.w3.org/2000/svg','line');
+      line.setAttribute('x1',padL); line.setAttribute('y1',Y); line.setAttribute('x2',W-padR); line.setAttribute('y2',Y); line.setAttribute('stroke',varGet('--grid'));
+      svg.appendChild(line);
+      const lbl=document.createElementNS('http://www.w3.org/2000/svg','text'); lbl.setAttribute('x',padL-6); lbl.setAttribute('y',Y+4); lbl.setAttribute('fill',varGet('--muted')); lbl.setAttribute('font-size','12'); lbl.setAttribute('text-anchor','end'); lbl.textContent=cc.toFixed(2); svg.appendChild(lbl);
+    }
+    const ax=document.createElementNS('http://www.w3.org/2000/svg','path'); ax.setAttribute('d',`M ${padL} ${padT} V ${H-padB} H ${W-padR}`); ax.setAttribute('stroke',varGet('--axis')); ax.setAttribute('stroke-width','1.4'); ax.setAttribute('fill','none'); svg.appendChild(ax);
+    const tx=document.createElementNS('http://www.w3.org/2000/svg','text'); tx.setAttribute('x',(padL+W-padR)/2); tx.setAttribute('y',H-10); tx.setAttribute('fill',varGet('--axis')); tx.setAttribute('font-size','13'); tx.textContent='capital per effective worker  k'; svg.appendChild(tx);
+    const ty=document.createElementNS('http://www.w3.org/2000/svg','text'); ty.setAttribute('x',18); ty.setAttribute('y',(padT+H-padB)/2); ty.setAttribute('fill',varGet('--axis')); ty.setAttribute('font-size','13'); ty.setAttribute('transform',`rotate(-90 18 ${(padT+H-padB)/2})`); ty.textContent='consumption per effective worker  c'; svg.appendChild(ty);
+  }
+
+  function drawIsoclines(){
+    const p1=[]; const steps=300; for(let i=0;i<=steps;i++){ const kk=(i/steps)*KMAX; p1.push({k:kk, c:Math.max(0, fA(kk,currentA) - ngd()*kk)}); }
+    const curve1=document.createElementNS('http://www.w3.org/2000/svg','path'); curve1.setAttribute('d', pathD(p1)); curve1.setAttribute('fill','none'); curve1.setAttribute('stroke',varGet('--kdot0')); curve1.setAttribute('stroke-width','2.2'); svg.appendChild(curve1);
+
+    const ks=k_star_A(currentA), cs=c_star_A(currentA);
+    const kline=document.createElementNS('http://www.w3.org/2000/svg','line'); kline.setAttribute('x1',x(ks)); kline.setAttribute('y1',y(0)); kline.setAttribute('x2',x(ks)); kline.setAttribute('y2',y(CMAX)); kline.setAttribute('stroke',varGet('--cdot0')); kline.setAttribute('stroke-width','2'); kline.setAttribute('stroke-dasharray','6 6'); svg.appendChild(kline);
+
+    const dot=document.createElementNS('http://www.w3.org/2000/svg','circle'); dot.setAttribute('cx',x(ks)); dot.setAttribute('cy',y(cs)); dot.setAttribute('r',3.2); dot.setAttribute('fill',varGet('--dot')); dot.setAttribute('opacity','0.9'); svg.appendChild(dot);
+  }
+
+  // --- Warm heatmap palette (faded) ---
+  const HEAT=['#FFE1A3','#FFC145','#FF9B2F','#F97626','#EF4B2E','#C6364B','#97326E','#6F2E84','#4A2C8F','#2D2A92'];
+  function heatColor(t){ const idx=Math.max(0,Math.min(HEAT.length-1, Math.floor(t*(HEAT.length-1)))); return HEAT[idx]; }
+  function drawHeatmap(){
+    const cols=100, rows=70; const g=addG('heatmap');
+    const mags=[]; for(let i=0;i<=cols;i+=2){ for(let j=0;j<=rows;j+=2){ const kk=(i/cols)*KMAX, cc=(j/rows)*CMAX; const d=derivA({k:kk,c:cc}, currentA); mags.push(Math.hypot(d.k,d.c)); }}
+    mags.sort((a,b)=>a-b); const p90=mags[Math.floor(0.90*(mags.length-1))] || 1e-9; const scale=(m)=>Math.min(1, Math.sqrt(Math.max(0,m)/p90));
+    const cw=(W-padL-padR)/cols, ch=(H-padT-padB)/rows;
+    for(let i=0;i<=cols;i++){
+      for(let j=0;j<=rows;j++){
+        const kk=(i/cols)*KMAX, cc=(j/rows)*CMAX; const d=derivA({k:kk,c:cc}, currentA); const m=Math.hypot(d.k,d.c); const t=scale(m);
+        const rect=document.createElementNS('http://www.w3.org/2000/svg','rect');
+        rect.setAttribute('x', padL + i*cw);
+        rect.setAttribute('y', padT + (rows-j)*ch);
+        rect.setAttribute('width', Math.ceil(cw)+1);
+        rect.setAttribute('height', Math.ceil(ch)+1);
+        rect.setAttribute('fill', heatColor(t));
+        rect.setAttribute('opacity', 0.18);
+        g.appendChild(rect);
+      }
+    }
+  }
+
+  // --- Discrete arrows ---
+  function drawVectorFieldArrows(){
+    const cols=18, rows=12; const g=addG('arrows');
+    for(let i=0;i<=cols;i++){
+      for(let j=0;j<=rows;j++){
+        const kk=(i/cols)*KMAX, cc=(j/rows)*CMAX; const d=derivA({k:kk,c:cc}, currentA);
+        let vx=d.k, vy=d.c; const nrm=Math.hypot(vx,vy)||1; vx/=nrm; vy/=nrm; const len=16;
+        const X=x(kk), Y=y(cc); const X2=X+len*vx, Y2=Y-len*vy;
+        const line=document.createElementNS('http://www.w3.org/2000/svg','line'); line.setAttribute('x1',X); line.setAttribute('y1',Y); line.setAttribute('x2',X2); line.setAttribute('y2',Y2); line.setAttribute('stroke',varGet('--arrow')); line.setAttribute('stroke-width','1'); line.setAttribute('opacity','0.45'); line.setAttribute('stroke-linecap','round'); g.appendChild(line);
+        const ah=document.createElementNS('http://www.w3.org/2000/svg','circle'); ah.setAttribute('cx',X2); ah.setAttribute('cy',Y2); ah.setAttribute('r',1.2); ah.setAttribute('fill',varGet('--arrow')); ah.setAttribute('opacity',0.45); g.appendChild(ah);
+      }
+    }
+  }
+
+  // --- Draw stable manifold (cached) — show only for k∈[2,7] ---
+  function drawStableManifold(){
+    const mf=getManifold(currentA); const p1=mf.plus, p2=mf.minus;
+    function draw(arr){ if(!arr.length) return; const clipped=arr.filter(p=>p.k>=2 && p.k<=7); if(!clipped.length) return; const path=document.createElementNS('http://www.w3.org/2000/svg','path'); path.setAttribute('d', pathD(clipped)); path.setAttribute('fill','none'); path.setAttribute('stroke',varGet('--saddle')); path.setAttribute('stroke-width','2.6'); svg.appendChild(path); }
+    draw(p1); draw(p2);
+  }
+
+  // --- Trajectory + simulation ---
+  let traj=[], times=[], simState=null, running=true, pinnedActive=false; // start running, not pinned
+  const SPEED_SUBSTEPS=5; const DT=0.02; // hidden fixed speed
+  let shockMarks=[]; // times when A toggles
+
+  function ensureInit(){ const ks=k_star_A(currentA), cs=c_star_A(currentA); simState={k:ks,c:cs}; traj=[{k:ks,c:cs}]; times=[0]; }
+  function drawTrajectory(){ if(!traj.length) return; const p=document.createElementNS('http://www.w3.org/2000/svg','path'); p.setAttribute('d', pathD(traj)); p.setAttribute('fill','none'); p.setAttribute('stroke',varGet('--traj')); p.setAttribute('stroke-width','2.0'); p.setAttribute('stroke-dasharray','6 5'); svg.appendChild(p); const last=traj[traj.length-1]; const dot=document.createElementNS('http://www.w3.org/2000/svg','circle'); dot.setAttribute('cx',x(last.k)); dot.setAttribute('cy',y(last.c)); dot.setAttribute('r',3.6); dot.setAttribute('fill',varGet('--traj')); svg.appendChild(dot); }
+  function stepSim(){ if(!simState){ ensureInit(); } for(let s=0;s<SPEED_SUBSTEPS;s++){ const next=rk4(DT, simState, (st)=>derivA(st,currentA)); next.k=clamp(next.k,0,KMAX*2); next.c=clamp(next.c,0,CMAX*2); simState=next; traj.push({k:simState.k,c:simState.c}); times.push((times[times.length-1]||0)+DT); if(traj.length>4000){ traj.shift(); times.shift(); } } }
+
+  // --- Time series k(t), c(t) + dashed stable refs + shock markers ---
+  const svgTS=document.getElementById('timeseries');
+  const Wt=900, Ht=180, padLt=60, padRt=20, padTt=16, padBt=36;
+  function xt(t, tmax){ return padLt + (t/tmax)*(Wt-padLt-padRt); }
+  function ytK(k){ return Ht - padBt - (k/KMAX)*(Ht-padTt-padBt); }
+  function ytC(c){ return Ht - padBt - (c/CMAX)*(Ht-padTt-padBt); }
+  function clearTS(){ while(svgTS.lastChild) svgTS.removeChild(svgTS.lastChild); }
+  function drawTS(){ clearTS();
+    const ax=document.createElementNS('http://www.w3.org/2000/svg','path'); ax.setAttribute('d',`M ${padLt} ${padTt} V ${Ht-padBt} H ${Wt-padRt}`); ax.setAttribute('stroke',varGet('--axis')); ax.setAttribute('fill','none'); ax.setAttribute('stroke-width','1.2'); svgTS.appendChild(ax);
+    const tmax = Math.max(10, times[times.length-1]||10);
+    for(let i=0;i<=5;i++){ const tt=(i/5)*tmax; const X=xt(tt,tmax); const g=document.createElementNS('http://www.w3.org/2000/svg','line'); g.setAttribute('x1',X); g.setAttribute('y1',padTt); g.setAttribute('x2',X); g.setAttribute('y2',Ht-padBt); g.setAttribute('stroke',varGet('--grid')); svgTS.appendChild(g); const lbl=document.createElementNS('http://www.w3.org/2000/svg','text'); lbl.setAttribute('x',X); lbl.setAttribute('y',Ht-12); lbl.setAttribute('text-anchor','middle'); lbl.setAttribute('fill',varGet('--muted')); lbl.textContent=tt.toFixed(0); svgTS.appendChild(lbl);}    
+    const ks=k_star_A(currentA), cs=c_star_A(currentA);
+    const ref1=document.createElementNS('http://www.w3.org/2000/svg','line'); ref1.setAttribute('x1',padLt); ref1.setAttribute('x2',Wt-padRt); ref1.setAttribute('y1',ytK(ks)); ref1.setAttribute('y2',ytK(ks)); ref1.setAttribute('stroke',varGet('--shock')); ref1.setAttribute('stroke-dasharray','5 5'); ref1.setAttribute('stroke-width','1.6'); ref1.setAttribute('opacity','0.8'); svgTS.appendChild(ref1);
+    const ref2=document.createElementNS('http://www.w3.org/2000/svg','line'); ref2.setAttribute('x1',padLt); ref2.setAttribute('x2',Wt-padRt); ref2.setAttribute('y1',ytC(cs)); ref2.setAttribute('y2',ytC(cs)); ref2.setAttribute('stroke',varGet('--shock')); ref2.setAttribute('stroke-dasharray','5 5'); ref2.setAttribute('stroke-width','1.6'); ref2.setAttribute('opacity','0.8'); svgTS.appendChild(ref2);
+    if(traj.length>1){
+      const ptsK=traj.map((p,i)=>({x:xt(times[i],tmax), y:ytK(p.k)})); const pathK=ptsK.map((p,i)=> (i?'L':'M')+` ${p.x} ${p.y}`).join(' '); const pk=document.createElementNS('http://www.w3.org/2000/svg','path'); pk.setAttribute('d',pathK); pk.setAttribute('fill','none'); pk.setAttribute('stroke',varGet('--traj')); pk.setAttribute('stroke-width','2'); svgTS.appendChild(pk);
+      const ptsC=traj.map((p,i)=>({x:xt(times[i],tmax), y:ytC(p.c)})); const pathC=ptsC.map((p,i)=> (i?'L':'M')+` ${p.x} ${p.y}`).join(' '); const pc=document.createElementNS('http://www.w3.org/2000/svg','path'); pc.setAttribute('d',pathC); pc.setAttribute('fill','none'); pc.setAttribute('stroke',varGet('--kdot0')); pc.setAttribute('stroke-width','2'); svgTS.appendChild(pc);
+      // shock markers
+      shockMarks.forEach(ts=>{ const X=xt(ts,tmax); const v=document.createElementNS('http://www.w3.org/2000/svg','line'); v.setAttribute('x1',X); v.setAttribute('y1',padTt); v.setAttribute('x2',X); v.setAttribute('y2',Ht-padBt); v.setAttribute('stroke',varGet('--shock')); v.setAttribute('stroke-width','2'); v.setAttribute('opacity','0.9'); svgTS.appendChild(v); });
+      const t1=document.createElementNS('http://www.w3.org/2000/svg','text'); t1.setAttribute('x', padLt+6); t1.setAttribute('y', padTt+14); t1.setAttribute('fill', varGet('--traj')); t1.textContent='k(t)'; svgTS.appendChild(t1);
+      const t2=document.createElementNS('http://www.w3.org/2000/svg','text'); t2.setAttribute('x', padLt+44); t2.setAttribute('y', padTt+14); t2.setAttribute('fill', varGet('--kdot0')); t2.textContent='c(t)'; svgTS.appendChild(t2);
+    }
+  }
+
+  // --- UI + redraw ---
+  const id=(x)=>document.getElementById(x);
+  function updateStats(){ const ks=k_star_A(currentA), cs=c_star_A(currentA), ys=fA(ks,currentA), eig=eigenStable(currentA); id('kstar').textContent=ks.toFixed(4); id('cstar').textContent=cs.toFixed(4); id('ystar').textContent=ys.toFixed(4); id('lamstab').textContent=(isFinite(eig.lambda)? eig.lambda.toFixed(4):'–'); setAText(); }
+  function redrawAll(){ clearSVG(); gridAndAxes(); drawHeatmap(); drawVectorFieldArrows(); drawIsoclines(); drawStableManifold(); drawTrajectory(); updateStats(); drawTS(); }
+  function loop(){ if(running) stepSim(); redrawAll(); requestAnimationFrame(loop); }
+
+  // --- Controls ---
+  id('run').addEventListener('click', ()=>{ if(!simState) ensureInit(); running=true; });
+  id('pause').addEventListener('click', ()=>{ running=false; });
+  id('reset').addEventListener('click', ()=>{ running=false; traj=[]; times=[]; simState=null; shockMarks=[]; });
+
+  // Click to set (k0,c0)
+  svg.addEventListener('mousedown', (ev)=>{ const pt=svg.createSVGPoint(); pt.x=ev.clientX; pt.y=ev.clientY; const ctm=svg.getScreenCTM().inverse(); const loc=pt.matrixTransform(ctm); const k0=clamp(invx(loc.x),0,KMAX), c0=clamp(invy(loc.y),0,CMAX); simState={k:k0,c:c0}; traj=[{k:k0,c:c0}]; times=[0]; shockMarks=[]; });
+
+  // Pin steady (jump there + start series anew)
+  id('pinSteady').addEventListener('click', ()=>{ const ks=k_star_A(currentA), cs=c_star_A(currentA); simState={k:ks,c:cs}; traj=[{k:ks,c:cs}]; times=[0]; shockMarks=[]; pinnedActive=true; });
+
+  // Toggle State: switch A. If pinned, jump to new stable manifold keeping same k, without resetting series
+  id('toggleShock').addEventListener('click', ()=>{
+    const newA=(currentA===BASE.A? BASE.A*SHOCK_FACTOR : BASE.A); const oldState=simState? {k:simState.k, c:simState.c}: null; const tNow=times[times.length-1]||0; currentA=newA; cacheManifold.A=null; // force recompute stable manifold
+    if(pinnedActive && oldState){ const kKeep=clamp(oldState.k,0,KMAX); let cProj=cOnStable(currentA,kKeep); if(!(isFinite(cProj))){ const slope=eigenStable(currentA).vec[1]/eigenStable(currentA).vec[0]; cProj=c_star_A(currentA)+slope*(kKeep-k_star_A(currentA)); } cProj=clamp(cProj,0,CMAX); simState={k:kKeep,c:cProj}; traj.push({k:simState.k,c:simState.c}); times.push(tNow); shockMarks.push(tNow); } else { shockMarks.push(tNow); }
+  });
+
+  document.addEventListener('keydown', (e)=>{ if(e.key==='r'||e.key==='R'){ running=!running; } if(e.key==='c'||e.key==='C'){ running=false; traj=[]; times=[]; simState=null; shockMarks=[]; } });
+
+  // ---------------- Self-tests (console) ----------------
+  function runSelfTests(){
+    try{
+      console.group('%cRCK tests (robust stable + no-reset + palette)','color:#20639B');
+      console.assert(Math.abs(x(0)-70)<1e-6 && Math.abs(x(10)-(900-24))<1e-6, 'x mapping');
+      console.assert(Math.abs(y(0)-(640-52))<1e-6 && Math.abs(y(2.3)-20)<1e-6, 'y mapping');
+      for(const A of [BASE.A, BASE.A*SHOCK_FACTOR]){ const ks=k_star_A(A), cs=c_star_A(A); console.assert(ks>0 && cs>=0, 'valid k*, c*'); const mf=manifoldPhase(A); const total=mf.plus.length+mf.minus.length; console.assert(total>10,'stable manifold reasonably dense'); const kProbe=Math.min(7,Math.max(2,ks+0.5)); const cProbe=cOnStable(A,kProbe); console.assert(isFinite(cProbe||NaN),'cOnStable finite'); }
+      // pin → (k*,c*)
+      const ks0=k_star_A(currentA), cs0=c_star_A(currentA); document.getElementById('pinSteady').click(); console.assert(Math.abs(simState.k-ks0)<1e-8 && Math.abs(simState.c-cs0)<1e-8,'pin ok');
+      // toggle with pin active keeps k and does NOT reset series
+      const lenBefore=times.length; const tBefore=times[times.length-1]; const kSaved=simState.k; document.getElementById('toggleShock').click(); const cStable=cOnStable(currentA,kSaved); console.assert(Math.abs(simState.k-kSaved)<1e-9,'toggle keeps k'); if(isFinite(cStable)) console.assert(Math.abs(simState.c-cStable)<1e-3,'projects onto stable'); console.assert(times.length>=lenBefore+1 && Math.abs(times[times.length-1]-tBefore)<1e-9,'no reset, jump at same t'); console.assert(shockMarks.length>=1,'shock marked');
+      console.log('%cOK','color:#3CAEA3'); console.groupEnd();
+    }catch(e){ console.error('Self-tests failed',e); }
+  }
+
+  // Init
+  setAText(); ensureInit(); requestAnimationFrame(function start(){ redrawAll(); runSelfTests(); requestAnimationFrame(loop); });
+})();
+</script>
+</body>
+</html>
