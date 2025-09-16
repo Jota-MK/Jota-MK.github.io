@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Q‑theory visualizer (Problem Set 6, Question 2) — v2.1</title>
+<!-- MathJax for LaTeX rendering in the notes (safe to load from CDN) -->
+<script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+<style>
+  :root{
+    --bg:#ffffff; --panel:#ffffff; --ink:#111827; --muted:#6b7280; --grid:#e5e7eb; --axis:#94a3b8;
+    --accent:#059669; --accent2:#2563eb; --warn:#f59e0b; --danger:#dc2626; --ok:#16a34a; --violet:#7b2cbf;
+    --sidebar-w:360px;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:500 15px/1.45 system-ui,Segoe UI,Roboto,Ubuntu,"Helvetica Neue",Arial}
+  header{padding:18px 20px;border-bottom:1px solid var(--grid);background:#fafafa;position:sticky;top:0;z-index:5}
+  header h1{margin:0;font-size:18px;letter-spacing:.2px}
+  header .sub{color:var(--muted);font-weight:400;font-size:13px}
+  .course-badge{display:inline-flex;align-items:center;gap:8px;padding:6px 10px;border:1px solid var(--grid);border-radius:999px;background:#fff;font-size:13px;color:var(--muted);margin-top:6px}
+  .dotblue{width:8px;height:8px;border-radius:999px;background:#2563eb}
+
+  .layout{display:block}
+  aside#controls{position:fixed;left:0;top:72px;width:var(--sidebar-w);bottom:0;overflow:auto;background:var(--panel);border-right:1px solid var(--grid);padding:14px;z-index:4}
+  main#content{margin-left:var(--sidebar-w);padding:16px}
+
+  .panel{background:var(--panel);border:1px solid var(--grid);border-radius:16px;padding:14px;margin-bottom:16px}
+  .warn{border-color:#fbbf24;background:#fff7ed;color:#92400e}
+  h2{margin:2px 0 10px 0;font-size:16px}
+  .row{display:grid;grid-template-columns:1fr 160px;gap:10px;align-items:center;margin:10px 0}
+  .row label{font-size:13px;color:var(--muted)}
+  input[type=range]{width:100%}
+  input[type=number], select{width:100%;padding:6px 8px;background:#fff;border:1px solid var(--grid);border-radius:8px;color:var(--ink)}
+  .val{font-variant-numeric:tabular-nums;min-width:70px;text-align:right}
+  .small{font-size:12px;color:var(--muted)}
+  .legend{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .chip{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)}
+  .chip .dot{width:10px;height:10px;border-radius:2px}
+  button{background:#fff;border:1px solid var(--grid);color:var(--ink);padding:8px 10px;border-radius:10px;cursor:pointer}
+  button:hover{background:#f8fafc}
+  svg{width:100%;height:360px;background:#fff;border-radius:12px;border:1px solid var(--grid)}
+  .grid line{stroke:var(--grid);stroke-width:1}
+  .axis text{fill:#334155;font-size:11px}
+  .note{font-size:12px;color:var(--muted)}
+  .math{background:#f8fafc;border:1px solid var(--grid);border-radius:12px;padding:12px;font-size:14px}
+  .ctl-euler{display:grid}
+  .ctl-qar{display:none}
+  @media (max-width:1100px){
+    :root{--sidebar-w:100%}
+    aside#controls{position:static;width:auto;border-right:none}
+    main#content{margin:0}
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>Q‑theory visualizer <span class="sub">— (Problem Set 6, Question 2) — v2.1</span></h1>
+  <div class="course-badge"><span class="dotblue"></span>
+    <strong>Macroeconomic Theory II (EPGE‑FGV)</strong>
+    <span>— Professor: Felipe S. Iachan</span>
+    <span>• TA: João Kling</span>
+    <span>• 2025</span>
+  </div>
+</header>
+
+<div class="layout">
+  <aside class="panel" id="controls">
+    <h2>Parameters & Controls</h2>
+
+    <div id="guard_warn" class="panel warn" style="display:none;margin-top:0;margin-bottom:10px">
+      <strong>Warning.</strong> With the current parameters, the per‑period growth factor <code>1 − δ + i(q_t)</code> becomes non‑positive at some t. Capital could collapse or flip sign in the simulation. Consider increasing ϕ, lowering σ, or reducing δ.
+    </div>
+
+    <div class="row">
+      <label><strong>Source of q<sub>t</sub></strong><br><span class="small">Euler: forward‑looking from A; q‑AR: direct AR(1) in q</span></label>
+      <select id="source_sel">
+        <option value="A_euler" selected>Aₜ → qₜ (Euler equation)</option>
+        <option value="q_ar1">Direct qₜ AR(1)</option>
+      </select>
+    </div>
+
+    <div class="row"><label>Irreversibility (resale fraction) s = 1 − λ<br><span class="small">Inaction band is [s,1] = [1−λ, 1]</span></label>
+      <div><input type="range" id="s_input" min="0" max="1" step="0.01" value="0.60" />
+        <div class="small val" id="s_val">0.60</div></div></div>
+    <div class="row"><label>Adjustment curvature ϕ <span class="small">Higher ⇒ flatter i(q)</span></label>
+      <div><input type="range" id="phi_input" min="0.5" max="12" step="0.05" value="4" />
+        <div class="small val" id="phi_val">4.00</div></div></div>
+
+    <div class="row"><label>Initial capital K₀</label>
+      <div><input type="range" id="K0_input" min="0.5" max="5.0" step="0.05" value="1.80" />
+        <div class="small val" id="K0_val">1.80</div></div></div>
+    <div class="row"><label>Depreciation δ</label>
+      <div><input type="range" id="delta_input" min="0.00" max="0.20" step="0.005" value="0.07" />
+        <div class="small val" id="delta_val">0.070</div></div></div>
+
+    <div class="row"><label>Fix q-axis scale (keep [s,1] band visually constant)</label>
+      <div style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="fix_q_scale" checked /><span class="small">lock</span></div></div>
+
+    <!-- Euler-only controls -->
+    <div class="row ctl-euler"><label>A‑mean \(\bar A\)</label>
+      <div><input type="range" id="Abar_input" min="0.6" max="1.5" step="0.01" value="1.00" />
+        <div class="small val" id="Abar_val">1.00</div></div></div>
+    <div class="row ctl-euler"><label>A persistence \(\rho_A\)</label>
+      <div><input type="range" id="rhoA_input" min="0" max="0.99" step="0.01" value="0.85" />
+        <div class="small val" id="rhoA_val">0.85</div></div></div>
+    <div class="row ctl-euler"><label>A innovation \(\sigma_A\)</label>
+      <div><input type="range" id="sigmaA_input" min="0" max="0.5" step="0.01" value="0.07" />
+        <div class="small val" id="sigmaA_val">0.07</div></div></div>
+    <div class="row ctl-euler"><label>Discount \(\beta\)</label>
+      <div><input type="range" id="beta_input" min="0.90" max="0.999" step="0.001" value="0.97" />
+        <div class="small val" id="beta_val">0.970</div></div></div>
+    <div class="row ctl-euler"><label>Impact \(\psi\) (on A)</label>
+      <div><input type="range" id="psi_input" min="0.0" max="3.0" step="0.05" value="1.00" />
+        <div class="small val" id="psi_val">1.00</div></div></div>
+
+    <!-- q‑AR-only controls -->
+    <div class="row ctl-qar"><label>q mean \(\bar q\)</label>
+      <div><input type="range" id="qbar_input" min="0.6" max="1.5" step="0.01" value="1.00" />
+        <div class="small val" id="qbar_val">1.00</div></div></div>
+    <div class="row ctl-qar"><label>q persistence \(\rho_q\)</label>
+      <div><input type="range" id="rhoq_input" min="0" max="0.99" step="0.01" value="0.85" />
+        <div class="small val" id="rhoq_val">0.85</div></div></div>
+    <div class="row ctl-qar"><label>q innovation \(\sigma_q\)</label>
+      <div><input type="range" id="sigmaq_input" min="0" max="0.5" step="0.01" value="0.08" />
+        <div class="small val" id="sigmaq_val">0.08</div></div></div>
+
+    <div class="row"><label>Horizon T (periods)</label>
+      <div><input type="range" id="T_input" min="40" max="1000" step="10" value="200" />
+        <div class="small val" id="T_val">200</div></div></div>
+    <div class="row"><label>Random seed</label>
+      <input type="number" id="seed_input" min="0" step="1" value="1" /></div>
+
+    <div class="row" style="grid-template-columns:1fr 1fr;gap:8px">
+      <button id="update_btn">Update graphs</button>
+      <button id="simulate_btn">Resimulate</button>
+    </div>
+
+    <p class="note">Compare how the <strong>Euler mapping</strong> vs a <strong>reduced‑form q‑AR</strong> changes time in/out of the inaction band.</p>
+  </aside>
+
+  <main id="content">
+    <section class="panel">
+      <h2>Stochastic q<sub>t</sub> path & implied actions</h2>
+      <div class="legend">
+        <span class="chip"><span class="dot" style="background:var(--muted)"></span> q<sub>t</sub></span>
+        <span class="chip"><span class="dot" style="background:var(--ok)"></span> Invest</span>
+        <span class="chip"><span class="dot" style="background:var(--danger)"></span> Disinvest</span>
+      </div>
+      <svg id="sim_svg" viewBox="0 0 800 360" aria-label="q path"></svg>
+      <div class="legend" style="margin-top:6px">
+        <span class="chip">Shares: invest <strong id="share_inv">–</strong>, inaction <strong id="share_ina">–</strong>, disinvest <strong id="share_dis">–</strong></span>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Capital stock K<sub>t</sub></h2>
+      <svg id="k_svg" viewBox="0 0 800 360" aria-label="K path"></svg>
+    </section>
+
+    <section class="panel">
+      <h2>Policy: i(q) with Inaction Band</h2>
+      <svg id="policy_svg" viewBox="0 0 800 360" aria-label="i(q) policy"></svg>
+      <div class="legend">
+        <span class="chip">Band [s,1] = [1−λ,1]: <strong id="band_lbl">[0.60, 1.00]</strong></span>
+        <span class="chip">λ = 1 − s: <strong id="lambda_lbl">0.40</strong></span>
+        <span class="chip">Slope outside: <strong id="slope_lbl">1/ϕ = 0.250</strong></span>
+        <span class="chip">Compact rule: <em>i(q) = ([q−1]_+ + [q−s]_−)/ϕ</em></span>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Costs & subgradients in x = K′ − (1−δ)K</h2>
+      <svg id="costs_svg" viewBox="0 0 800 360"></svg>
+    </section>
+
+    <section class="panel">
+      <h2>Derivative & subgradients of i(q)</h2>
+      <svg id="deriv_svg" viewBox="0 0 800 360" aria-label="i'(q) and subgradients"></svg>
+    </section>
+
+    <section class="panel">
+      <h2>Local one‑period objective L(x; \(\bar q\))</h2>
+      <svg id="value_svg" viewBox="0 0 800 360"></svg>
+      <div class="legend">
+        <span class="chip">x* (best adjustment): <strong id="xstar_lbl">–</strong></span>
+        <span class="chip">i* = x*/K: <strong id="istar_lbl">–</strong></span>
+        <span class="chip">Region: <strong id="region_lbl">–</strong></span>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Math & model notes</h2>
+      <div class="math">
+        <p><strong>Trigger policy with irreversibility.</strong>
+Using positive/negative–part operators \([x]_+=\max\{x,0\}\) and \([x]_- =\min\{x,0\}\),
+the policy is
+\[ i(q)=\frac{1}{\varphi}\big([\,q-1\,]_+ + [\,q-s\,]_-\big). \]
+Equivalently, with the projection \(\Pi_{[s,1]}\) onto the inaction band,
+\[ i(q)=\frac{1}{\varphi}\big(q-\Pi_{[s,1]}(q)\big). \]
+Outside the band the slope is \(1/\varphi\); at \(q\in\{s,1\}\) the subgradient is \([0,1/\varphi]\).
+</p>
+        <p><strong>Irreversibility parameter.</strong> Write \(\lambda\equiv 1-s\). Then the inaction band is \([1-\lambda,1]\), and lower resale fractions (larger \(\lambda\)) widen the band.
+        </p>
+        <p><strong>Primitives & net purchase cost.</strong> Adjustment cost \(G(x,K)=(\varphi/2)\,x^2/K\). The <em>net purchase cost</em> is
+        \(S(x)=x\) if \(x\ge0\) (buy one unit at price 1), and \(S(x)=s\,x\) if \(x<0\) (sell one unit and receive \(s\in(0,1)\)). Total period cost is \(G(x,K)+S(x)\). Maximizing \(q\,x-G-S\) yields the policy above.</p>
+        <p><strong>Capital law of motion (ratio form).</strong>
+Let \(r_t\equiv K_t/K_0\) with \(r_0=1\). Since \(K_{t+1}=(1-\delta+i(q_t))K_t\), we get
+\[ r_{t+1}=(1-\delta+i(q_t))\,r_t. \]
+The “Capital stock” chart reports \(r_t=K_t/K_0\) for comparability.
+</p>
+        <p><strong>Euler‑driven q (deviations).</strong> With productivity deviations \(a_t=A_t-\bar A\) and AR(1) persistence \(\rho_A\):
+          \[ q_t^{\text{dev}} = \beta\big( (1-\delta)\,\mathbb E_t\,q_{t+1}^{\text{dev}} + \psi\,a_{t+1} \big). \]
+          A linear solution implies a loading \(\kappa=\beta\psi/[1-\beta(1-\delta)\rho_A]\). The code uses the backward recursion consistent with this and recenters \(q_t=\bar q+q_t^{\text{dev}}\).
+        </p>
+      </div>
+    </section>
+  </main>
+</div>
+
+<script>
+// ---------------- Utilities ----------------
+function clamp(x,a,b){return Math.max(a,Math.min(b,x));}
+function rng(seed){ let x=(seed>>>0)||1; return ()=>{ x^=x<<13; x^=x>>>17; x^=x<<5; return ((x>>>0)/4294967296); }; }
+function normal(rand){
+  // Box–Muller transform
+  let u = 0, v = 0; while (u === 0) u = rand(); while (v === 0) v = rand();
+  return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+}
+function $svg(tag){return document.createElementNS('http://www.w3.org/2000/svg',tag)}
+
+// ---------------- DOM ----------------
+const sInput = document.getElementById('s_input');
+const phiInput = document.getElementById('phi_input');
+const sourceSel = document.getElementById('source_sel');
+const K0Input = document.getElementById('K0_input');
+const deltaInput = document.getElementById('delta_input');
+const fixQScale = document.getElementById('fix_q_scale');
+const AbarInput = document.getElementById('Abar_input');
+const rhoAInput = document.getElementById('rhoA_input');
+const sigmaAInput = document.getElementById('sigmaA_input');
+const betaInput = document.getElementById('beta_input');
+const psiInput = document.getElementById('psi_input');
+const qbarInput = document.getElementById('qbar_input');
+const rhoqInput = document.getElementById('rhoq_input');
+const sigmaqInput = document.getElementById('sigmaq_input');
+const TInput = document.getElementById('T_input');
+const seedInput = document.getElementById('seed_input');
+
+const bandLbl = document.getElementById('band_lbl');
+const slopeLbl = document.getElementById('slope_lbl');
+const lambdaLbl = document.getElementById('lambda_lbl');
+const shareInv = document.getElementById('share_inv');
+const shareIna = document.getElementById('share_ina');
+const shareDis = document.getElementById('share_dis');
+const xstarLbl = document.getElementById('xstar_lbl');
+const istarLbl = document.getElementById('istar_lbl');
+const regionLbl = document.getElementById('region_lbl');
+const guardWarn = document.getElementById('guard_warn');
+
+const policySVG = document.getElementById('policy_svg');
+const simSVG = document.getElementById('sim_svg');
+const kSVG = document.getElementById('k_svg');
+const derivSVG = document.getElementById('deriv_svg');
+const costsSVG = document.getElementById('costs_svg');
+const valueSVG = document.getElementById('value_svg');
+
+// ---------------- Reflect & visibility ----------------
+const fmt=(x,n=2)=> Number(x).toFixed(n);
+function reflect(){
+  const set=(id,val)=>{const el=document.getElementById(id); if(el) el.textContent=val;};
+  set('s_val',fmt(sInput.value)); set('phi_val',fmt(phiInput.value));
+  set('K0_val',fmt(K0Input.value)); set('delta_val',Number(deltaInput.value).toFixed(3));
+  set('Abar_val',fmt(AbarInput.value)); set('rhoA_val',fmt(rhoAInput.value)); set('sigmaA_val',fmt(sigmaAInput.value));
+  set('beta_val',Number(betaInput.value).toFixed(3)); set('psi_val',fmt(psiInput.value));
+  set('qbar_val',fmt(qbarInput.value)); set('rhoq_val',fmt(rhoqInput.value)); set('sigmaq_val',fmt(sigmaqInput.value));
+  set('T_val',TInput.value);
+}
+function showHideControls(){
+  const src=sourceSel.value;
+  document.querySelectorAll('.ctl-euler').forEach(el=>{el.style.display = (src==='A_euler')?'grid':'none'});
+  document.querySelectorAll('.ctl-qar').forEach(el=>{el.style.display = (src==='q_ar1')?'grid':'none'});
+}
+
+// ---------------- Core primitives ----------------
+function i_of_q(q,s,phi){ return q>1 ? (q-1)/phi : (q<s ? (q-s)/phi : 0); }
+
+// ---------------- Plots ----------------
+function drawPolicy(){
+  const s = clamp(parseFloat(sInput.value),0,1);
+  const phi = Math.max(1e-4, parseFloat(phiInput.value));
+  const qmin = Math.min(s-0.4, 0.2), qmax = 1.6;
+
+  // determine i-range dynamically from current phi and q-range
+  const iCandidates = [ (qmin-s)/phi, 0, (qmax-1)/phi ];
+  const imin = Math.min(...iCandidates) - 0.08*Math.abs(Math.min(...iCandidates));
+  const imax = Math.max(...iCandidates) + 0.08*Math.abs(Math.max(...iCandidates));
+
+  if(bandLbl) bandLbl.textContent = `[${s.toFixed(2)}, 1.00]`;
+  if(lambdaLbl) lambdaLbl.textContent = (1 - s).toFixed(2);
+  if(slopeLbl) slopeLbl.textContent = `1/ϕ = ${(1/phi).toFixed(3)}`;
+
+  const W=800,H=360,P={l:48,r:16,t:16,b:36};
+  const x = q => P.l + (q - qmin) * (W-P.l-P.r)/(qmax - qmin);
+  const y = i => H-P.b - (i - imin) * (H-P.t-P.b)/(imax - imin);
+  policySVG.innerHTML='';
+
+  const grid=$svg('g');grid.setAttribute('class','grid');
+  for(let gx=Math.ceil(qmin*10)/10; gx<=qmax; gx+=0.1){
+    const L=$svg('line');L.setAttribute('x1',x(gx));L.setAttribute('x2',x(gx));L.setAttribute('y1',y(imin));L.setAttribute('y2',y(imax));grid.appendChild(L);
+  }
+  for(let gy=Math.ceil(imin*10)/10; gy<=imax; gy+=0.1){
+    const L=$svg('line');L.setAttribute('x1',x(qmin));L.setAttribute('x2',x(qmax));L.setAttribute('y1',y(gy));L.setAttribute('y2',y(gy));grid.appendChild(L);
+  }
+  policySVG.appendChild(grid);
+
+  const band=$svg('rect');
+  band.setAttribute('x',x(s));band.setAttribute('y',y(imax));band.setAttribute('width',x(1)-x(s));band.setAttribute('height',y(imin)-y(imax));
+  band.setAttribute('fill','rgba(217,119,6,0.08)'); band.setAttribute('stroke','rgba(217,119,6,0.35)'); policySVG.appendChild(band);
+
+  const xlabel=$svg('text'); xlabel.setAttribute('x',(x(qmin)+x(qmax))/2); xlabel.setAttribute('y',H-2); xlabel.setAttribute('text-anchor','middle'); xlabel.textContent='q'; xlabel.style.fontSize='12px'; xlabel.style.fill='#64748b'; policySVG.appendChild(xlabel);
+  const ylabel=$svg('text'); ylabel.setAttribute('x',14); ylabel.setAttribute('y',14); ylabel.setAttribute('text-anchor','start'); ylabel.textContent='i(q) = I/K'; ylabel.style.fontSize='12px'; ylabel.style.fill='#64748b'; policySVG.appendChild(ylabel);
+
+  const z=$svg('line'); z.setAttribute('x1',x(qmin)); z.setAttribute('x2',x(qmax)); z.setAttribute('y1',y(0)); z.setAttribute('y2',y(0)); z.setAttribute('stroke','#94a3b8'); z.setAttribute('stroke-dasharray','4 4'); policySVG.appendChild(z);
+
+  function segPath(points,color){ const p=$svg('path'); p.setAttribute('d',points.map((pt,i)=>(i?'L':'M')+x(pt[0])+','+y(pt[1])).join(' ')); p.setAttribute('fill','none'); p.setAttribute('stroke',color); p.setAttribute('stroke-width','3'); return p; }
+  policySVG.appendChild(segPath([[qmin,(qmin - s)/phi],[s,0]],'#dc2626'));
+  const mid=$svg('line'); mid.setAttribute('x1',x(s)); mid.setAttribute('x2',x(1)); mid.setAttribute('y1',y(0)); mid.setAttribute('y2',y(0)); mid.setAttribute('stroke','#d97706'); mid.setAttribute('stroke-width','4'); policySVG.appendChild(mid);
+  policySVG.appendChild(segPath([[1,0],[qmax,(qmax - 1)/phi]],'#059669'));
+}
+
+function drawDeriv(){
+  const s = clamp(parseFloat(sInput.value),0,1);
+  const phi = Math.max(1e-4, parseFloat(phiInput.value));
+  const qmin = Math.min(s-0.4, 0.2), qmax = 1.6;
+  const ymin = -0.05, ymax = 1/phi + 0.05;
+  const W=800,H=360,P={l:48,r:16,t:16,b:36};
+  const x = q => P.l + (q - qmin) * (W-P.l-P.r)/(qmax - qmin);
+  const y = v => H-P.b - (v - ymin) * (H-P.t-P.b)/(ymax - ymin);
+  derivSVG.innerHTML='';
+  const grid=$svg('g');grid.setAttribute('class','grid');
+  for(let gx=Math.ceil(qmin*10)/10; gx<=qmax; gx+=0.1){ const L=$svg('line'); L.setAttribute('x1',x(gx)); L.setAttribute('x2',x(gx)); L.setAttribute('y1',y(ymin)); L.setAttribute('y2',y(ymax)); grid.appendChild(L);} derivSVG.appendChild(grid);
+  function seg(x1,x2,yv,color,width=3){ const p=$svg('line'); p.setAttribute('x1',x(x1)); p.setAttribute('x2',x(x2)); p.setAttribute('y1',y(yv)); p.setAttribute('y2',y(yv)); p.setAttribute('stroke',color); p.setAttribute('stroke-width',width); return p; }
+  derivSVG.appendChild(seg(qmin, s, 1/phi, '#2563eb'));
+  derivSVG.appendChild(seg(s, 1, 0, '#94a3b8', 4));
+  derivSVG.appendChild(seg(1, qmax, 1/phi, '#2563eb'));
+  function vbar(q){ const vb=$svg('line'); vb.setAttribute('x1',x(q)); vb.setAttribute('x2',x(q)); vb.setAttribute('y1',y(0)); vb.setAttribute('y2',y(1/phi)); vb.setAttribute('stroke','#0ea5e9'); vb.setAttribute('stroke-width','4'); vb.setAttribute('stroke-linecap','round'); return vb; }
+  derivSVG.appendChild(vbar(s)); derivSVG.appendChild(vbar(1));
+}
+
+function drawCosts(){
+  const s = clamp(parseFloat(sInput.value),0,1), K=parseFloat(K0Input.value||'1.8'), phi = Math.max(1e-4, parseFloat(phiInput.value));
+  const xmin=-0.6, xmax=0.6; const xs=[]; let ylo=1e9,yhi=-1e9;
+  for(let i=0;i<=600;i++){ const x=xmin+(xmax-xmin)*i/600; xs.push(x); const g=0.5*phi*(x*x)/K, ss=(x>=0?x:s*x), gs=g+ss; ylo=Math.min(ylo,g,ss,gs,s*x,1*x); yhi=Math.max(yhi,g,ss,gs,s*x,1*x); }
+  const pad=(yhi-ylo)*0.12; ylo-=pad; yhi+=pad;
+  const W=800,H=360,P={l:48,r:16,t:16,b:36}; const x=t=>P.l+(t-xmin)*(W-P.l-P.r)/(xmax-xmin); const y=v=>H-P.b-(v-ylo)*(H-P.t-P.b)/(yhi-ylo);
+  costsSVG.innerHTML='';
+  const grid=$svg('g'); grid.setAttribute('class','grid');
+  for(let gx=xmin;gx<=xmax+1e-9;gx+=(xmax-xmin)/10){const L=$svg('line');L.setAttribute('x1',x(gx));L.setAttribute('x2',x(gx));L.setAttribute('y1',y(ylo));L.setAttribute('y2',y(yhi));grid.appendChild(L);} 
+  for(let gy=ylo;gy<=yhi+1e-9;gy+=(yhi-ylo)/10){const L=$svg('line');L.setAttribute('x1',x(xmin));L.setAttribute('x2',x(xmax));L.setAttribute('y1',y(gy));L.setAttribute('y2',y(gy));grid.appendChild(L);} costsSVG.appendChild(grid);
+  function path(data, f, col, w, dash){ const p=$svg('path'); let d=''; data.forEach((xx,i)=>{ const yy=f(xx); d+=(i?'L':'M')+x(xx)+','+y(yy)+' '; }); p.setAttribute('d',d.trim()); p.setAttribute('fill','none'); p.setAttribute('stroke',col); p.setAttribute('stroke-width',w); if(dash) p.setAttribute('stroke-dasharray',dash); costsSVG.appendChild(p); }
+  path(xs, x=> (x>=0?x:s*x),'#e76f51',2); // S(x)
+  path(xs, x=> 0.5*phi*(x*x)/K,'#2a9d8f',2); // G(x,K)
+  path(xs, x=> (x>=0?x:s*x) + 0.5*phi*(x*x)/K,'#264653',3); // total cost
+  path(xs, x=> s*x,'#f4a261',2,'6 4'); // resale line
+  path(xs, x=> 1*x,'#1d3557',2,'6 4'); // purchase line
+  const z=$svg('line'); z.setAttribute('x1',x(xmin)); z.setAttribute('x2',x(xmax)); z.setAttribute('y1',y(0)); z.setAttribute('y2',y(0)); z.setAttribute('stroke','#94a3b8'); z.setAttribute('stroke-dasharray','4 4'); costsSVG.appendChild(z);
+  const x0=$svg('line'); x0.setAttribute('x1',x(0)); x0.setAttribute('x2',x(0)); x0.setAttribute('y1',y(ylo)); x0.setAttribute('y2',y(yhi)); x0.setAttribute('stroke','#94a3b8'); x0.setAttribute('stroke-dasharray','3 4'); costsSVG.appendChild(x0);
+}
+
+function drawValue(){
+  const s=parseFloat(sInput.value), K=parseFloat(K0Input.value||'1.8'), phi=Math.max(1e-4, parseFloat(phiInput.value));
+  const qbar=parseFloat(qbarInput.value||'1.0'), delta=parseFloat(deltaInput.value||'0.07');
+  const xmin=-0.6, xmax=0.6; const xs=[]; let ylo=1e9,yhi=-1e9; let bestX=xmin, bestV=-1e99;
+  function L(x){ return -0.5*phi*(x*x)/K - (x>=0?x:s*x) + qbar*((1-delta)*K + x); }
+  const base = L(0);
+  for(let i=0;i<=600;i++){ const x=xmin+(xmax-xmin)*i/600; xs.push(x); const v=L(x); const vn= v-base; ylo=Math.min(ylo,vn); yhi=Math.max(yhi,vn); if(v>bestV){bestV=v; bestX=x;} }
+  const pad=(yhi-ylo)*0.12; ylo-=pad; yhi+=pad;
+  const W=800,H=360,P={l:48,r:16,t:16,b:36}; const x=t=>P.l+(t-xmin)*(W-P.l-P.r)/(xmax-xmin); const y=v=>H-P.b-(v-ylo)*(H-P.t-P.b)/(yhi-ylo);
+  valueSVG.innerHTML='';
+  const grid=$svg('g'); grid.setAttribute('class','grid');
+  for(let gx=xmin;gx<=xmax+1e-9;gx+=(xmax-xmin)/10){const L=$svg('line');L.setAttribute('x1',x(gx));L.setAttribute('x2',x(gx));L.setAttribute('y1',y(ylo));L.setAttribute('y2',y(yhi));grid.appendChild(L);} 
+  for(let gy=ylo;gy<=yhi+1e-9;gy+=(yhi-ylo)/10){const L=$svg('line');L.setAttribute('x1',x(xmin));L.setAttribute('x2',x(xmax));L.setAttribute('y1',y(gy));L.setAttribute('y2',y(gy));grid.appendChild(L);} valueSVG.appendChild(grid);
+  const path=$svg('path'); let d=''; xs.forEach((xx,i)=>{ const v=L(xx)-base; d+=(i?'L':'M')+x(xx)+','+y(v)+' '; }); path.setAttribute('d',d.trim()); path.setAttribute('fill','none'); path.setAttribute('stroke','var(--violet)'); path.setAttribute('stroke-width','3'); valueSVG.appendChild(path);
+  const x0=$svg('line'); x0.setAttribute('x1',x(0)); x0.setAttribute('x2',x(0)); x0.setAttribute('y1',y(ylo)); x0.setAttribute('y2',y(yhi)); x0.setAttribute('stroke','#999'); x0.setAttribute('stroke-dasharray','4 4'); valueSVG.appendChild(x0);
+  const xsLine=$svg('line'); xsLine.setAttribute('x1',x(bestX)); xsLine.setAttribute('x2',x(bestX)); xsLine.setAttribute('y1',y(ylo)); xsLine.setAttribute('y2',y(yhi)); xsLine.setAttribute('stroke','#7b2cbf'); xsLine.setAttribute('stroke-dasharray','3 3'); valueSVG.appendChild(xsLine);
+  if(xstarLbl) xstarLbl.textContent = bestX.toFixed(3);
+  if(istarLbl) istarLbl.textContent = (bestX/ K).toFixed(3);
+  if(regionLbl) regionLbl.textContent = (qbar>1? 'Invest (q̄>1)' : (qbar<s? 'Disinvest (q̄<s)' : 'Inaction (q̄∈[s,1])'));
+}
+
+// ---------------- Simulation (Euler or q‑AR) + capital path ----------------
+function simulateA(){
+  const Abar=parseFloat(AbarInput.value||'1.0'), rho=clamp(parseFloat(rhoAInput.value||'0.85'),0,0.999), sig=Math.max(0,parseFloat(sigmaAInput.value||'0.07'));
+  const T=Math.max(10, parseInt(TInput.value||'200')); const R=rng((parseInt(seedInput.value)||1));
+  let At=Abar; const A=new Float64Array(T);
+  for(let t=0;t<T;t++){ const eps=normal(R); At=(1-rho)*Abar + rho*At + sig*eps; A[t]=At; }
+  return A;
+}
+
+function q_from_euler(A){
+  const T=A.length; const qbar=parseFloat(qbarInput.value||'1.0');
+  const Abar=parseFloat(AbarInput.value||'1.0'), beta=parseFloat(betaInput.value||'0.97'), psi=parseFloat(psiInput.value||'1.0'), delta=parseFloat(deltaInput.value||'0.07'), rhoA=parseFloat(rhoAInput.value||'0.85');
+  const a = new Float64Array(T); for(let t=0;t<T;t++){ a[t]=A[t]-Abar; }
+  const denom = 1 - beta*(1-delta)*rhoA; const kappa = (Math.abs(denom)>1e-9) ? (beta*psi/denom) : beta*psi; 
+  const qdev = new Float64Array(T+1); qdev[T] = kappa * a[T-1];
+  for(let t=T-2;t>=0;--t){ qdev[t] = beta*((1-delta)*qdev[t+1] + psi*a[t+1]); }
+  const q=new Float64Array(T); for(let t=0;t<T;t++){ q[t] = qbar + qdev[t]; }
+  return q;
+}
+
+function q_from_ar(){
+  const T=Math.max(10, parseInt(TInput.value||'200'));
+  const qbar=parseFloat(qbarInput.value||'1.0'), rho=clamp(parseFloat(rhoqInput.value||'0.85'),0,0.999), sig=Math.max(0, parseFloat(sigmaqInput.value||'0.08'));
+  const R=rng((parseInt(seedInput.value)||1)); let qt=qbar; const qs=new Float64Array(T);
+  for(let t=0;t<T;t++){ const eps=normal(R); qt=(1-rho)*qbar + rho*qt + sig*eps; qs[t]=qt; }
+  return qs;
+}
+
+function drawKPath(qs){
+  const T = qs.length;
+  const s = parseFloat(sInput.value),
+        phi = parseFloat(phiInput.value),
+        delta = clamp(parseFloat(deltaInput.value || '0.07'),0,0.9999);
+
+  const K0 = parseFloat(K0Input.value || '1.8');
+  let K = K0;
+
+  const Rs = new Float64Array(T);
+  const acts = new Int8Array(T);
+  let badFactor = false;
+
+  for (let t = 0; t < T; t++) {
+    Rs[t] = K / K0;
+    const it = i_of_q(qs[t], s, phi);
+    acts[t] = (it > 0 ? 1 : (it < 0 ? -1 : 0));
+    const growth = (1 - delta + it);
+    if(growth <= 0) badFactor = true;
+    K = growth * K;
+  }
+
+  // show/hide guard warning
+  if(guardWarn) guardWarn.style.display = badFactor ? 'block' : 'none';
+
+  // scales
+  const W = 800, H = 360, P = { l:48, r:16, t:16, b:36 };
+  const ymin = Math.min(...Rs), ymax = Math.max(...Rs);
+  const pad  = (ymax - ymin) * 0.12 || 0.12;
+
+  const x = t => P.l + t * (W - P.l - P.r) / (T - 1);
+  const y = v => H - P.b - (v - (ymin - pad)) * (H - P.t - P.b) / ((ymax + pad) - (ymin - pad));
+
+  kSVG.innerHTML = '';
+
+  const grid = $svg('g'); grid.setAttribute('class','grid');
+  for (let gx = 0; gx < T; gx += Math.max(1, Math.floor(T/10))) {
+    const L = $svg('line');
+    L.setAttribute('x1', x(gx)); L.setAttribute('x2', x(gx));
+    L.setAttribute('y1', y(ymin - pad)); L.setAttribute('y2', y(ymax + pad));
+    grid.appendChild(L);
+  }
+  kSVG.appendChild(grid);
+
+  const stepW = (W - P.l - P.r) / (T - 1);
+  for (let t = 0; t < T; t++) {
+    if (acts[t] !== 0) {
+      const rect = $svg('rect');
+      rect.setAttribute('x', x(t) - stepW/2);
+      rect.setAttribute('y', y(ymax + pad));
+      rect.setAttribute('width', stepW);
+      rect.setAttribute('height', y(ymin - pad) - y(ymax + pad));
+      rect.setAttribute('fill', acts[t] > 0 ? 'rgba(22,163,74,0.08)' : 'rgba(220,38,38,0.08)');
+      kSVG.appendChild(rect);
+    }
+  }
+
+  const path = $svg('path'); let d = '';
+  for (let t = 0; t < T; t++) d += (t ? 'L' : 'M') + x(t) + ',' + y(Rs[t]) + ' ';
+  path.setAttribute('d', d.trim());
+  path.setAttribute('fill', 'none');
+  path.setAttribute('stroke', '#1f2937');
+  path.setAttribute('stroke-width', '2');
+  kSVG.appendChild(path);
+
+  const ylabel = $svg('text');
+  ylabel.setAttribute('x', 14); ylabel.setAttribute('y', 14);
+  ylabel.setAttribute('text-anchor', 'start');
+  ylabel.textContent = 'K_t / K_0';
+  ylabel.style.fontSize = '12px'; ylabel.style.fill = '#64748b';
+  kSVG.appendChild(ylabel);
+}
+
+function simulateQ(){
+  const src=sourceSel.value; const s = clamp(parseFloat(sInput.value),0,1);
+  let qs;
+  if(src==='A_euler'){ const A = simulateA(); qs = q_from_euler(A); }
+  else { qs = q_from_ar(); }
+  const T=qs.length;
+  const W=800,H=360,P={l:48,r:16,t:16,b:36};
+  let qmin,qmax;
+  if(fixQScale.checked){ qmin=Math.min(s-0.2,0.6); qmax=1.6; }
+  else { qmin=Math.min(s-0.2, Math.min(...qs)); qmax=Math.max(1.4, Math.max(...qs)); }
+  const x=t=>P.l+t*(W-P.l-P.r)/(T-1), y=q=>H-P.b-(q-qmin)*(H-P.t-P.b)/(qmax-qmin || 1);
+
+  const acts=new Int8Array(T); let cI=0,cN=0,cD=0;
+  for(let t=0;t<T;t++){ const q=qs[t]; if(q>1){acts[t]=1;cI++;} else if(q<s){acts[t]=-1;cD++;} else {acts[t]=0;cN++;} }
+
+  simSVG.innerHTML='';
+  const grid=$svg('g'); grid.setAttribute('class','grid');
+  for(let gx=0; gx<T; gx+=Math.max(1,Math.floor(T/10))){ const L=$svg('line'); L.setAttribute('x1',x(gx)); L.setAttribute('x2',x(gx)); L.setAttribute('y1',y(qmin)); L.setAttribute('y2',y(qmax)); grid.appendChild(L);} simSVG.appendChild(grid);
+
+  const bandTop=y(1), bandBot=y(s);
+  const rect=$svg('rect'); rect.setAttribute('x',x(0)); rect.setAttribute('y',bandTop); rect.setAttribute('width',x(T-1)-x(0)); rect.setAttribute('height',bandBot-bandTop); rect.setAttribute('fill','rgba(217,119,6,0.08)'); rect.setAttribute('stroke','rgba(217,119,6,0.35)'); simSVG.appendChild(rect);
+
+  const path=$svg('path'); let d=''; for(let t=0;t<T;t++){ d += (t?'L':'M') + x(t)+','+y(qs[t]) + ' '; } path.setAttribute('d',d.trim()); path.setAttribute('fill','none'); path.setAttribute('stroke','#111827'); path.setAttribute('stroke-width','2'); simSVG.appendChild(path);
+
+  for(let t=0;t<T;t++){ const q=qs[t]; const a=acts[t]; const dot=$svg('circle'); dot.setAttribute('cx',x(t)); dot.setAttribute('cy',y(q)); dot.setAttribute('r',2.4); if(a>0) dot.setAttribute('fill','var(--ok)'); else if(a<0) dot.setAttribute('fill','var(--danger)'); else dot.setAttribute('fill','#94a3b8'); simSVG.appendChild(dot); }
+
+  const l1=$svg('line'); l1.setAttribute('x1',x(0)); l1.setAttribute('x2',x(T-1)); l1.setAttribute('y1',y(1)); l1.setAttribute('y2',y(1)); l1.setAttribute('stroke','#94a3b8'); l1.setAttribute('stroke-dasharray','3 4'); simSVG.appendChild(l1);
+  const ls=$svg('line'); ls.setAttribute('x1',x(0)); ls.setAttribute('x2',x(T-1)); ls.setAttribute('y1',y(s)); ls.setAttribute('y2',y(s)); ls.setAttribute('stroke','#94a3b8'); ls.setAttribute('stroke-dasharray','3 4'); simSVG.appendChild(ls);
+
+  shareInv.textContent=(cI/T*100).toFixed(1)+'%';
+  shareIna.textContent=(cN/T*100).toFixed(1)+'%';
+  shareDis.textContent=(cD/T*100).toFixed(1)+'%';
+
+  drawKPath(qs);
+}
+
+// ---------------- Init & Events ----------------
+function updateAll(){ reflect(); showHideControls(); simulateQ(); drawPolicy(); drawCosts(); drawDeriv(); drawValue(); }
+['input','change'].forEach(evt=>{
+  [sInput,phiInput,sourceSel,K0Input,deltaInput,fixQScale,AbarInput,rhoAInput,sigmaAInput,betaInput,psiInput,qbarInput,rhoqInput,sigmaqInput,TInput,seedInput].forEach(el=> el.addEventListener(evt, updateAll));
+});
+
+document.getElementById('update_btn').addEventListener('click', updateAll);
+
+document.getElementById('simulate_btn').addEventListener('click', ()=>{
+  seedInput.value = (parseInt(seedInput.value||'0') + 1).toString();
+  updateAll();
+});
+
+updateAll();
+</script>
+</body>
+</html>
