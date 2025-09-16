@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Q‑Theory with irreversibility (Problem Set 6, Question 2)</title>
+<style>
+  :root{--bg:#ffffff;--panel:#ffffff;--ink:#0f172a;--muted:#64748b;--grid:#e5e7eb;--axis:#94a3b8;--accent:#059669;--accent2:#2563eb;--warn:#d97706;--danger:#dc2626;--ok:#16a34a;--violet:#7b2cbf}
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{margin:0;background:var(--bg);color:var(--ink);font:500 15px/1.45 system-ui,Segoe UI,Roboto,Ubuntu,"Helvetica Neue",Arial}
+  header{position:sticky;top:0;z-index:5;background:#fafafa;border-bottom:1px solid var(--grid)}
+  .header-wrap{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;gap:12px}
+  h1{margin:0;font-size:18px}
+  .course{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--grid);background:#fff;border-radius:999px;padding:6px 10px;font-size:13px}
+  .course b{font-weight:700}
+  .dot{width:8px;height:8px;border-radius:999px;background:var(--accent2);display:inline-block}
+
+  /* 2-column: sticky controls | scrolling graphs */
+  .layout{display:grid;grid-template-columns:360px 1fr;gap:16px;padding:16px}
+  .sidebar{position:sticky;top:64px;height:calc(100vh - 64px);overflow:auto}
+  .main{min-height:100vh}
+  .stack{display:flex;flex-direction:column;gap:16px}
+
+  /* Cards */
+  .panel{background:var(--panel);border:1px solid var(--grid);border-radius:16px;padding:14px}
+  .panel h2{margin:2px 0 10px 0;font-size:16px}
+  .note{font-size:12px;color:var(--muted)}
+  .legend{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .chip{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)}
+  .chip .dot{width:10px;height:10px;border-radius:2px}
+  .badge{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px;border:1px solid var(--grid);background:#f8fafc;color:var(--ink)}
+  .row{display:grid;grid-template-columns:1fr 120px;gap:10px;align-items:center;margin:10px 0}
+  .row label{font-size:13px;color:var(--muted)}
+  input[type=range]{width:100%}
+  input[type=number]{width:100%;padding:6px 8px;background:#fff;border:1px solid var(--grid);border-radius:8px;color:var(--ink)}
+  .val{font-variant-numeric:tabular-nums;min-width:70px;text-align:right}
+  .toggle{display:flex;align-items:center;gap:8px}
+  button{background:#fff;border:1px solid var(--grid);color:var(--ink);padding:8px 10px;border-radius:10px;cursor:pointer}
+  button:hover{background:#f8fafc}
+
+  /* SVG */
+  svg{width:100%;height:360px;background:#fff;border-radius:12px;border:1px solid var(--grid)}
+  .grid line{stroke:var(--grid);stroke-width:1}
+  .axis path,.axis line{stroke:var(--axis)}
+  .axis text{fill:#334155;font-size:11px}
+  .kpis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:8px}
+  .kpi{background:#f8fafc;border:1px solid var(--grid);border-radius:12px;padding:10px}
+  .kpi .h{font-size:11px;color:var(--muted)}
+  .kpi .v{font-size:16px;margin-top:4px}
+
+  /* Math explainer (readable) */
+  .math{font-size:16px;line-height:1.6}
+  .math h3{margin:12px 0 4px 0;font-size:17px}
+  details{border:1px solid var(--grid);border-radius:12px;padding:10px 12px;background:#fcfcfd}
+  details+details{margin-top:10px}
+  summary{cursor:pointer;font-weight:600}
+  .eq{font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size:14px; color:#0f172a; background:#f8fafc; border:1px solid var(--grid); border-radius:10px; padding:6px 8px}
+
+  @media (max-width: 1100px){.layout{grid-template-columns:1fr}.sidebar{position:static;height:auto}}
+</style>
+</head>
+<body>
+  <header>
+    <div class="header-wrap">
+      <h1>Q‑theory visualizer</h1>
+      <div class="course"><span class="dot"></span>
+        <b>Macroeconomic Theory II (EPGE‑FGV)</b> — Professor: Felipe S. Iachan • TA: João Kling • <b>2025</b>
+      </div>
+    </div>
+  </header>
+
+  <div class="layout">
+    <!-- Left: Controls -->
+    <aside class="sidebar">
+      <section class="panel" id="controls">
+        <h2>Parameters & Controls</h2>
+        <div class="row"><label>Irreversibility (resale) s = 1 − λ<br><span class="note">Inaction width λ = 1 − s</span></label>
+          <div><input type="range" id="s_input" min="0" max="1" step="0.01" value="0.70" /><div class="val note" id="s_val">0.70</div></div>
+        </div>
+        <div class="row"><label>Adjustment curvature ϕ</label>
+          <div><input type="range" id="phi_input" min="0.5" max="12" step="0.05" value="7.75" /><div class="val note" id="phi_val">7.75</div></div>
+        </div>
+        <div class="row"><label>Capital level K</label>
+          <div><input type="range" id="K_input" min="0.5" max="2" step="0.1" value="1.80" /><div class="val note" id="K_val">1.80</div></div>
+        </div>
+        <div class="row"><label>Depreciation δ</label>
+          <div><input type="range" id="delta_input" min="0" max="0.25" step="0.005" value="0.07" /><div class="val note" id="delta_val">0.07</div></div>
+        </div>
+        <div class="row"><label>q‑process mean q̄</label>
+          <div><input type="range" id="qbar_input" min="0.4" max="1.5" step="0.01" value="0.90" /><div class="val note" id="qbar_val">0.90</div></div>
+        </div>
+        <div class="row"><label>AR(1) persistence ρ<sub>q</sub></label>
+          <div><input type="range" id="rhoq_input" min="0" max="0.99" step="0.01" value="0.85" /><div class="val note" id="rhoq_val">0.85</div></div>
+        </div>
+        <div class="row"><label>Innovation std σ<sub>q</sub></label>
+          <div><input type="range" id="sigmaq_input" min="0" max="0.5" step="0.01" value="0.07" /><div class="val note" id="sigmaq_val">0.07</div></div>
+        </div>
+        <div class="row"><label>Horizon T</label>
+          <div><input type="range" id="T_input" min="40" max="1000" step="10" value="240" /><div class="val note" id="T_val">240</div></div>
+        </div>
+        <div class="row"><label>Normalize L(x; q̄)</label>
+          <div class="toggle"><input type="checkbox" id="normL_input" checked /><span class="note">Center curve at x=0</span></div>
+        </div>
+        <div class="row"><label>Random seed</label>
+          <input type="number" id="seed_input" min="0" step="1" value="3" />
+        </div>
+        <div class="row" style="grid-template-columns:1fr 1fr;gap:8px">
+          <button id="update_btn">Update graphs</button>
+          <button id="simulate_btn">Resimulate q<sub>t</sub></button>
+        </div>
+        <p class="note">Policy: <span class="badge">i(q)=(q−1)/ϕ if q>1</span> · <span class="badge">i(q)=0 if q∈[s,1]</span> · <span class="badge">i(q)=(q−s)/ϕ if q<s</span></p>
+      </section>
+    </aside>
+
+    <!-- Center: Graphs in requested order: q-path, policy, costs, derivative, value -->
+    <main class="main">
+      <div class="stack">
+        <section class="panel">
+          <h2>Stochastic q<sub>t</sub> path & implied actions</h2>
+          <div class="legend">
+            <span class="chip"><span class="dot" style="background:var(--muted)"></span> q<sub>t</sub></span>
+            <span class="chip"><span class="dot" style="background:var(--ok)"></span> Invest</span>
+            <span class="chip"><span class="dot" style="background:var(--danger)"></span> Disinvest</span>
+          </div>
+          <svg id="sim_svg" viewBox="0 0 800 360"></svg>
+          <div class="kpis">
+            <div class="kpi"><div class="h">Share invest</div><div class="v" id="share_inv">–</div></div>
+            <div class="kpi"><div class="h">Share inaction</div><div class="v" id="share_ina">–</div></div>
+            <div class="kpi"><div class="h">Share disinvest</div><div class="v" id="share_dis">–</div></div>
+          </div>
+        </section>
+
+        <section class="panel">
+          <h2>Policy: i(q) with Inaction Band</h2>
+          <div class="legend">
+            <span class="chip"><span class="dot" style="background:var(--accent)"></span> Invest (q>1)</span>
+            <span class="chip"><span class="dot" style="background:var(--warn)"></span> Inaction (s ≤ q ≤ 1)</span>
+            <span class="chip"><span class="dot" style="background:var(--danger)"></span> Disinvest (q<s)</span>
+          </div>
+          <svg id="policy_svg" viewBox="0 0 800 360"></svg>
+          <div class="kpis">
+            <div class="kpi"><div class="h">Band [s,1]</div><div class="v" id="band_lbl">–</div></div>
+            <div class="kpi"><div class="h">Slope outside band</div><div class="v" id="slope_lbl">–</div></div>
+            <div class="kpi"><div class="h">Zero‑investment line</div><div class="v">i(q)=0 on [s,1]</div></div>
+          </div>
+        </section>
+
+        <section class="panel">
+          <h2>Costs & Subgradients in x = K′ − (1−δ)K</h2>
+          <div class="legend">
+            <span class="chip"><span class="dot" style="background:#e76f51"></span> S(x)</span>
+            <span class="chip"><span class="dot" style="background:#2a9d8f"></span> G(x,K)</span>
+            <span class="chip"><span class="dot" style="background:#264653"></span> G(x)+S(x)</span>
+            <span class="chip"><span class="dot" style="background:#f4a261"></span> subgrad s·x</span>
+            <span class="chip"><span class="dot" style="background:#1d3557"></span> subgrad 1·x</span>
+          </div>
+          <svg id="costs_svg" viewBox="0 0 800 360"></svg>
+        </section>
+
+        <section class="panel">
+          <h2>Derivative & subgradients of i(q)</h2>
+          <div class="legend">
+            <span class="chip"><span class="dot" style="background:var(--accent2)"></span> i′(q)=1/ϕ outside</span>
+            <span class="chip"><span class="dot" style="background:#94a3b8"></span> i′(q)=0 inside</span>
+          </div>
+          <svg id="deriv_svg" viewBox="0 0 800 360"></svg>
+          <p class="note">At q=s and q=1, the subgradient set is [0, 1/ϕ] (vertical bars below).</p>
+        </section>
+
+        <section class="panel">
+          <h2>Local Value Function L(x; q̄)</h2>
+          <div class="legend">
+            <span class="chip"><span class="dot" style="background:var(--violet)"></span> L(x; q̄)</span>
+            <span class="chip"><span class="dot" style="background:#999"></span> x=0</span>
+            <span class="chip"><span class="dot" style="background:#7b2cbf"></span> x*</span>
+          </div>
+          <svg id="value_svg" viewBox="0 0 800 360"></svg>
+          <div class="kpis">
+            <div class="kpi"><div class="h">x* (best adjustment)</div><div class="v" id="xstar_lbl">–</div></div>
+            <div class="kpi"><div class="h">i* = x*/K</div><div class="v" id="istar_lbl">–</div></div>
+            <div class="kpi"><div class="h">q̄ region</div><div class="v" id="region_lbl">–</div></div>
+          </div>
+        </section>
+
+        <!-- Readable Math Explainer -->
+        <section class="panel math" id="math">
+          <h2>Math notes</h2>
+          <details open>
+            <summary>1) Primitives & definitions</summary>
+            <p>Net investment: <span class="eq">x = K' − (1−δ)K</span>. Rate: <span class="eq">i = x/K</span>. Irreversibility via resale fraction <span class="eq">s∈[0,1]</span> ⇒ inaction band width <span class="eq">λ = 1 − s</span>.</p>
+          </details>
+          <details>
+            <summary>2) Costs</summary>
+            <p>Quadratic adjustment: <span class="eq">G(x,K) = (ϕ/2)·x²/K</span>. Irreversibility wedge:</p>
+            <p class="eq">S(x)= { x if x≥0;  s·x if x&lt;0 }.</p>
+            <p>Total cost is <span class="eq">G(x,K)+S(x)</span>; tangent rays <span class="eq">s·x</span> and <span class="eq">1·x</span> bound the kink at <span class="eq">x=0</span>.</p>
+          </details>
+          <details>
+            <summary>3) Policy i(q)</summary>
+            <p>From the KKT/complementarity one gets</p>
+            <p class="eq">i(q)= {(q−1)/ϕ if q&gt;1; 0 if s≤q≤1; (q−s)/ϕ if q&lt;s }.</p>
+            <p>Outside the band the slope is <span class="eq">1/ϕ</span>; inside, <span class="eq">i=0</span>.</p>
+          </details>
+          <details>
+            <summary>4) Subgradients</summary>
+            <p>At the kinks <span class="eq">q∈{s,1}</span>, the Clarke subgradient is the interval <span class="eq">[0,1/ϕ]</span>, shown as vertical bars in the derivative plot.</p>
+          </details>
+          <details>
+            <summary>5) Value (one‑period)</summary>
+            <p class="eq">L(x; q̄) = q̄·((1−δ)K + x) − G(x,K) − S(x).</p>
+            <p>We plot it vs. <span class="eq">x</span> and mark the maximizer <span class="eq">x*</span>. The checkbox recenters by subtracting <span class="eq">L(0; q̄)</span>.</p>
+          </details>
+          <details>
+            <summary>6) q‑process</summary>
+            <p>Simulation: <span class="eq">q_t = (1−ρ)·q̄ + ρ·q_{t−1} + σ·ε_t</span> with <span class="eq">ε_t∼𝒩(0,1)</span>. Regimes: invest if <span class="eq">q_t&gt;1</span>, disinvest if <span class="eq">q_t<s</span>, else inaction.</p>
+          </details>
+        </section>
+      </div>
+    </main>
+  </div>
+
+<script>
+// ---- Utilities ----
+function clamp(x,a,b){return Math.max(a,Math.min(b,x));}
+function rng(seed){ let x=(seed>>>0)||1; return ()=>{ x^=x<<13; x^=x>>>17; x^=x<<5; return ((x>>>0)/4294967296); }; }
+function normal(rand){ let u=0,v=0; while(u===0)u=rand(); while(v===0)v=rand(); return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v); }
+const Sx=(x,s)=> x>=0? x : s*x;
+const Gx=(x,K,phi)=> 0.5*phi*(x*x)/K;
+
+// ---- DOM refs ----
+const sInput = document.getElementById('s_input');
+const phiInput = document.getElementById('phi_input');
+const KInput = document.getElementById('K_input');
+const deltaInput = document.getElementById('delta_input');
+const qbarInput = document.getElementById('qbar_input');
+const rhoqInput = document.getElementById('rhoq_input');
+const sigmaqInput = document.getElementById('sigmaq_input');
+const TInput = document.getElementById('T_input');
+const normLInput = document.getElementById('normL_input');
+const seedInput = document.getElementById('seed_input');
+
+const bandLbl = document.getElementById('band_lbl');
+const slopeLbl = document.getElementById('slope_lbl');
+const shareInv = document.getElementById('share_inv');
+const shareIna = document.getElementById('share_ina');
+const shareDis = document.getElementById('share_dis');
+const xstarLbl = document.getElementById('xstar_lbl');
+const istarLbl = document.getElementById('istar_lbl');
+const regionLbl = document.getElementById('region_lbl');
+
+const policySVG = document.getElementById('policy_svg');
+const simSVG = document.getElementById('sim_svg');
+const derivSVG = document.getElementById('deriv_svg');
+const costsSVG = document.getElementById('costs_svg');
+const valueSVG = document.getElementById('value_svg');
+
+// ---- Reflect slider values ----
+const fmt=(x,n=2)=> Number(x).toFixed(n);
+function reflect(){
+  document.getElementById('s_val').textContent = fmt(sInput.value);
+  document.getElementById('phi_val').textContent = fmt(phiInput.value);
+  document.getElementById('K_val').textContent = fmt(KInput.value);
+  document.getElementById('delta_val').textContent = fmt(deltaInput.value);
+  document.getElementById('qbar_val').textContent = fmt(qbarInput.value);
+  document.getElementById('rhoq_val').textContent = fmt(rhoqInput.value);
+  document.getElementById('sigmaq_val').textContent = fmt(sigmaqInput.value);
+  document.getElementById('T_val').textContent = TInput.value;
+}
+
+// ---- Policy plot ----
+function drawPolicy(){
+  const s=parseFloat(sInput.value), phi=parseFloat(phiInput.value);
+  const qmin=Math.min(s-0.4,0.2), qmax=1.6, imin=-0.6/phi-0.05, imax=0.6/phi+0.05;
+  bandLbl.textContent = `[${s.toFixed(2)}, 1.00]`; slopeLbl.textContent = `1/ϕ = ${(1/phi).toFixed(3)}`;
+  const W=800,H=360,P={l:48,r:16,t:16,b:36};
+  const x=q=>P.l+(q-qmin)*(W-P.l-P.r)/(qmax-qmin); const y=i=>H-P.b-(i-imin)*(H-P.t-P.b)/(imax-imin);
+  policySVG.innerHTML='';
+  const grid=document.createElementNS('http://www.w3.org/2000/svg','g'); grid.setAttribute('class','grid');
+  for(let gx=Math.ceil(qmin*10)/10;gx<=qmax;gx+=0.1){const L=document.createElementNS('http://www.w3.org/2000/svg','line');L.setAttribute('x1',x(gx));L.setAttribute('x2',x(gx));L.setAttribute('y1',y(imin));L.setAttribute('y2',y(imax));grid.appendChild(L);} 
+  for(let gy=Math.ceil(imin*10)/10;gy<=imax;gy+=0.1){const L=document.createElementNS('http://www.w3.org/2000/svg','line');L.setAttribute('x1',x(qmin));L.setAttribute('x2',x(qmax));L.setAttribute('y1',y(gy));L.setAttribute('y2',y(gy));grid.appendChild(L);} 
+  policySVG.appendChild(grid);
+  const rect=document.createElementNS('http://www.w3.org/2000/svg','rect'); rect.setAttribute('x',x(s)); rect.setAttribute('y',y(imax)); rect.setAttribute('width',x(1)-x(s)); rect.setAttribute('height',y(imin)-y(imax)); rect.setAttribute('fill','rgba(217,119,6,0.08)'); rect.setAttribute('stroke','rgba(217,119,6,0.35)'); policySVG.appendChild(rect);
+  const axis=document.createElementNS('http://www.w3.org/2000/svg','g'); axis.setAttribute('class','axis');
+  const xLabel=document.createElementNS('http://www.w3.org/2000/svg','text'); xLabel.setAttribute('x', (x(qmin)+x(qmax))/2); xLabel.setAttribute('y', H-2); xLabel.setAttribute('text-anchor','middle'); xLabel.textContent='q'; xLabel.style.fill='#64748b'; axis.appendChild(xLabel);
+  const yLabel=document.createElementNS('http://www.w3.org/2000/svg','text'); yLabel.setAttribute('x', 14 ); yLabel.setAttribute('y', 14 ); yLabel.setAttribute('text-anchor','start'); yLabel.textContent='i(q)=I/K'; yLabel.style.fill='#64748b'; axis.appendChild(yLabel); policySVG.appendChild(axis);
+  const zL=document.createElementNS('http://www.w3.org/2000/svg','line'); zL.setAttribute('x1',x(qmin)); zL.setAttribute('x2',x(qmax)); zL.setAttribute('y1',y(0)); zL.setAttribute('y2',y(0)); zL.setAttribute('stroke','#94a3b8'); zL.setAttribute('stroke-dasharray','4 4'); policySVG.appendChild(zL);
+  function seg(a,b){const p=document.createElementNS('http://www.w3.org/2000/svg','path'); p.setAttribute('d',`M${x(a[0])},${y(a[1])} L${x(b[0])},${y(b[1])}`); p.setAttribute('fill','none'); p.setAttribute('stroke',a[0]<s? '#dc2626': (a[0]>=1?'#059669':'#d97706')); p.setAttribute('stroke-width', a[0]<s?3:(a[0]>=1?3:4)); return p;}
+  policySVG.appendChild(seg([qmin,(qmin-s)/phi],[s,0]));
+  policySVG.appendChild(seg([s,0],[1,0]));
+  policySVG.appendChild(seg([1,0],[qmax,(qmax-1)/phi]));
+  function mark(q,label){const L=document.createElementNS('http://www.w3.org/2000/svg','line');L.setAttribute('x1',x(q));L.setAttribute('x2',x(q));L.setAttribute('y1',y(imax));L.setAttribute('y2',y(imin));L.setAttribute('stroke','#94a3b8');L.setAttribute('stroke-dasharray','3 4');policySVG.appendChild(L);const T=document.createElementNS('http://www.w3.org/2000/svg','text');T.setAttribute('x',x(q));T.setAttribute('y',y(imin)+15);T.setAttribute('text-anchor','middle');T.textContent=label;T.style.fill='#334155';T.style.fontSize='11px';policySVG.appendChild(T);} mark(s,'s'); mark(1,'1');
+}
+
+// ---- Derivative plot ----
+function drawDeriv(){
+  const s=parseFloat(sInput.value), phi=parseFloat(phiInput.value);
+  const qmin=Math.min(s-0.4,0.2), qmax=1.6, ymin=-0.05, ymax=1/phi+0.05;
+  const W=800,H=360,P={l:48,r:16,t:16,b:36};
+  const x=q=>P.l+(q-qmin)*(W-P.l-P.r)/(qmax-qmin); const y=v=>H-P.b-(v-ymin)*(H-P.t-P.b)/(ymax-ymin);
+  derivSVG.innerHTML='';
+  const grid=document.createElementNS('http://www.w3.org/2000/svg','g'); grid.setAttribute('class','grid');
+  for(let gx=Math.ceil(qmin*10)/10;gx<=qmax;gx+=0.1){const L=document.createElementNS('http://www.w3.org/2000/svg','line');L.setAttribute('x1',x(gx));L.setAttribute('x2',x(gx));L.setAttribute('y1',y(ymin));L.setAttribute('y2',y(ymax));grid.appendChild(L);} derivSVG.appendChild(grid);
+  const axis=document.createElementNS('http://www.w3.org/2000/svg','g'); axis.setAttribute('class','axis');
+  const xLabel=document.createElementNS('http://www.w3.org/2000/svg','text'); xLabel.setAttribute('x',(x(qmin)+x(qmax))/2); xLabel.setAttribute('y',H-2); xLabel.setAttribute('text-anchor','middle'); xLabel.textContent='q'; xLabel.style.fill='#64748b'; axis.appendChild(xLabel);
+  const yLabel=document.createElementNS('http://www.w3.org/2000/svg','text'); yLabel.setAttribute('x',14); yLabel.setAttribute('y',14); yLabel.setAttribute('text-anchor','start'); yLabel.textContent="i′(q)"; yLabel.style.fill='#64748b'; axis.appendChild(yLabel); derivSVG.appendChild(axis);
+  function hseg(a,b,yv,col,w){const L=document.createElementNS('http://www.w3.org/2000/svg','line');L.setAttribute('x1',x(a));L.setAttribute('x2',x(b));L.setAttribute('y1',y(yv));L.setAttribute('y2',y(yv));L.setAttribute('stroke',col);L.setAttribute('stroke-width',w);return L;}
+  derivSVG.appendChild(hseg(qmin,s,1/phi,'#2563eb',3));
+  derivSVG.appendChild(hseg(s,1,0,'#94a3b8',4));
+  derivSVG.appendChild(hseg(1,qmax,1/phi,'#2563eb',3));
+  function vbar(q){const vb=document.createElementNS('http://www.w3.org/2000/svg','line'); vb.setAttribute('x1',x(q)); vb.setAttribute('x2',x(q)); vb.setAttribute('y1',y(0)); vb.setAttribute('y2',y(1/phi)); vb.setAttribute('stroke','#0ea5e9'); vb.setAttribute('stroke-width','4'); vb.setAttribute('stroke-linecap','round'); return vb; }
+  derivSVG.appendChild(vbar(s)); derivSVG.appendChild(vbar(1));
+}
+
+// ---- Costs plot ----
+function drawCosts(){
+  const s=parseFloat(sInput.value), K=parseFloat(KInput.value), phi=parseFloat(phiInput.value);
+  const xmin=-0.6, xmax=0.6; const xs=[]; let ylo=1e9,yhi=-1e9;
+  for(let i=0;i<=600;i++){ const x=xmin+(xmax-xmin)*i/600; xs.push(x); const g=0.5*phi*(x*x)/K, ss=(x>=0?x:s*x), gs=g+ss; ylo=Math.min(ylo,g,ss,gs,s*x,1*x); yhi=Math.max(yhi,g,ss,gs,s*x,1*x); }
+  const pad=(yhi-ylo)*0.12; ylo-=pad; yhi+=pad;
+  const W=800,H=360,P={l:48,r:16,t:16,b:36}; const x=t=>P.l+(t-xmin)*(W-P.l-P.r)/(xmax-xmin); const y=v=>H-P.b-(v-ylo)*(H-P.t-P.b)/(yhi-ylo);
+  costsSVG.innerHTML='';
+  const grid=document.createElementNS('http://www.w3.org/2000/svg','g'); grid.setAttribute('class','grid');
+  for(let gx=xmin;gx<=xmax+1e-9;gx+=(xmax-xmin)/10){const L=document.createElementNS('http://www.w3.org/2000/svg','line');L.setAttribute('x1',x(gx));L.setAttribute('x2',x(gx));L.setAttribute('y1',y(ylo));L.setAttribute('y2',y(yhi));grid.appendChild(L);} 
+  for(let gy=ylo;gy<=yhi+1e-9;gy+=(yhi-ylo)/10){const L=document.createElementNS('http://www.w3.org/2000/svg','line');L.setAttribute('x1',x(xmin));L.setAttribute('x2',x(xmax));L.setAttribute('y1',y(gy));L.setAttribute('y2',y(gy));grid.appendChild(L);} costsSVG.appendChild(grid);
+  function path(data, f, col, w, dash){ const p=document.createElementNS('http://www.w3.org/2000/svg','path'); let d=''; data.forEach((xx,i)=>{ const yy=f(xx); d+=(i?'L':'M')+x(xx)+','+y(yy)+' '; }); p.setAttribute('d',d.trim()); p.setAttribute('fill','none'); p.setAttribute('stroke',col); p.setAttribute('stroke-width',w); if(dash) p.setAttribute('stroke-dasharray',dash); costsSVG.appendChild(p); }
+  path(xs, x=> (x>=0?x:s*x),'#e76f51',2);
+  path(xs, x=> 0.5*phi*(x*x)/K,'#2a9d8f',2);
+  path(xs, x=> (x>=0?x:s*x) + 0.5*phi*(x*x)/K,'#264653',3);
+  path(xs, x=> s*x,'#f4a261',2,'6 4');
+  path(xs, x=> 1*x,'#1d3557',2,'6 4');
+  const z=document.createElementNS('http://www.w3.org/2000/svg','line'); z.setAttribute('x1',x(xmin)); z.setAttribute('x2',x(xmax)); z.setAttribute('y1',y(0)); z.setAttribute('y2',y(0)); z.setAttribute('stroke','#94a3b8'); z.setAttribute('stroke-dasharray','4 4'); costsSVG.appendChild(z);
+  const x0=document.createElementNS('http://www.w3.org/2000/svg','line'); x0.setAttribute('x1',x(0)); x0.setAttribute('x2',x(0)); x0.setAttribute('y1',y(ylo)); x0.setAttribute('y2',y(yhi)); x0.setAttribute('stroke','#94a3b8'); x0.setAttribute('stroke-dasharray','3 4'); costsSVG.appendChild(x0);
+}
+
+// ---- Value plot ----
+function drawValue(){
+  const s=parseFloat(sInput.value), K=parseFloat(KInput.value), phi=parseFloat(phiInput.value), qbar=parseFloat(qbarInput.value), delta=parseFloat(deltaInput.value), norm=!!normLInput.checked;
+  const xmin=-0.6, xmax=0.6; const xs=[]; let ylo=1e9,yhi=-1e9; let bestX=xmin, bestV=-1e99, base= -0.5*phi*(0)/K - (0>=0?0:s*0) + qbar*((1-delta)*K + 0);
+  function L(x){ return -0.5*phi*(x*x)/K - (x>=0?x:s*x) + qbar*((1-delta)*K + x); }
+  for(let i=0;i<=600;i++){ const x=xmin+(xmax-xmin)*i/600; xs.push(x); const v=L(x); const vn=norm? v-base : v; ylo=Math.min(ylo,vn); yhi=Math.max(yhi,vn); if(v>bestV){bestV=v; bestX=x;} }
+  const pad=(yhi-ylo)*0.12; ylo-=pad; yhi+=pad;
+  const W=800,H=360,P={l:48,r:16,t:16,b:36}; const x=t=>P.l+(t-xmin)*(W-P.l-P.r)/(xmax-xmin); const y=v=>H-P.b-(v-ylo)*(H-P.t-P.b)/(yhi-ylo);
+  valueSVG.innerHTML='';
+  const grid=document.createElementNS('http://www.w3.org/2000/svg','g'); grid.setAttribute('class','grid');
+  for(let gx=xmin;gx<=xmax+1e-9;gx+=(xmax-xmin)/10){const L=document.createElementNS('http://www.w3.org/2000/svg','line');L.setAttribute('x1',x(gx));L.setAttribute('x2',x(gx));L.setAttribute('y1',y(ylo));L.setAttribute('y2',y(yhi));grid.appendChild(L);} 
+  for(let gy=ylo;gy<=yhi+1e-9;gy+=(yhi-ylo)/10){const L=document.createElementNS('http://www.w3.org/2000/svg','line');L.setAttribute('x1',x(xmin));L.setAttribute('x2',x(xmax));L.setAttribute('y1',y(gy));L.setAttribute('y2',y(gy));grid.appendChild(L);} valueSVG.appendChild(grid);
+  const path=document.createElementNS('http://www.w3.org/2000/svg','path'); let d=''; xs.forEach((xx,i)=>{ const v=L(xx) - (norm? base:0); d+=(i?'L':'M')+x(xx)+','+y(v)+' '; }); path.setAttribute('d',d.trim()); path.setAttribute('fill','none'); path.setAttribute('stroke','var(--violet)'); path.setAttribute('stroke-width','3'); valueSVG.appendChild(path);
+  const x0=document.createElementNS('http://www.w3.org/2000/svg','line'); x0.setAttribute('x1',x(0)); x0.setAttribute('x2',x(0)); x0.setAttribute('y1',y(ylo)); x0.setAttribute('y2',y(yhi)); x0.setAttribute('stroke','#999'); x0.setAttribute('stroke-dasharray','4 4'); valueSVG.appendChild(x0);
+  const xsLine=document.createElementNS('http://www.w3.org/2000/svg','line'); xsLine.setAttribute('x1',x(bestX)); xsLine.setAttribute('x2',x(bestX)); xsLine.setAttribute('y1',y(ylo)); xsLine.setAttribute('y2',y(yhi)); xsLine.setAttribute('stroke','#7b2cbf'); xsLine.setAttribute('stroke-dasharray','3 3'); valueSVG.appendChild(xsLine);
+  xstarLbl.textContent = bestX.toFixed(3);
+  istarLbl.textContent = (bestX/ K).toFixed(3);
+  regionLbl.textContent = (qbar>1? 'Invest (q̄>1)' : (qbar<s? 'Disinvest (q̄<s)' : 'Inaction (q̄∈[s,1])'));
+}
+
+// ---- Simulation ----
+function simulateQ(){
+  const s=parseFloat(sInput.value), qbar=parseFloat(qbarInput.value), rho=clamp(parseFloat(rhoqInput.value),0,0.999), sig=Math.max(0,parseFloat(sigmaqInput.value)), T=Math.max(10,parseInt(TInput.value)), seed=parseInt(seedInput.value)||1;
+  const W=800,H=360,P={l:48,r:16,t:16,b:36};
+  const qmin=Math.min(s-0.2, qbar-3*sig-0.1), qmax=Math.max(1.4, qbar+3*sig+0.1);
+  const x=t=>P.l+t*(W-P.l-P.r)/(T-1), y=q=>H-P.b-(q-qmin)*(H-P.t-P.b)/(qmax-qmin);
+  const R=rng(seed); let qt=qbar; const qs=new Float64Array(T);
+  for(let t=0;t<T;t++){const eps=normal(R); qt=(1-rho)*qbar + rho*qt + sig*eps; qs[t]=qt;}
+  const acts=new Int8Array(T); let cI=0,cN=0,cD=0; for(let t=0;t<T;t++){const q=qs[t]; if(q>1){acts[t]=1;cI++;} else if(q<s){acts[t]=-1;cD++;} else {acts[t]=0;cN++;}}
+  simSVG.innerHTML='';
+  const grid=document.createElementNS('http://www.w3.org/2000/svg','g'); grid.setAttribute('class','grid'); for(let gx=0;gx<T;gx+=Math.max(1,Math.floor(T/10))){const L=document.createElementNS('http://www.w3.org/2000/svg','line'); L.setAttribute('x1',x(gx)); L.setAttribute('x2',x(gx)); L.setAttribute('y1',y(qmin)); L.setAttribute('y2',y(qmax)); grid.appendChild(L);} simSVG.appendChild(grid);
+  const rect=document.createElementNS('http://www.w3.org/2000/svg','rect'); rect.setAttribute('x',x(0)); rect.setAttribute('y',y(1)); rect.setAttribute('width',x(T-1)-x(0)); rect.setAttribute('height',y(s)-y(1)); rect.setAttribute('fill','rgba(217,119,6,0.08)'); rect.setAttribute('stroke','rgba(217,119,6,0.35)'); simSVG.appendChild(rect);
+  const path=document.createElementNS('http://www.w3.org/2000/svg','path'); let d=''; for(let t=0;t<T;t++){d+=(t?'L':'M')+x(t)+','+y(qs[t])+' ';} path.setAttribute('d',d.trim()); path.setAttribute('fill','none'); path.setAttribute('stroke','#0f172a'); path.setAttribute('stroke-width','2'); simSVG.appendChild(path);
+  for(let t=0;t<T;t++){const q=qs[t], a=acts[t]; const dot=document.createElementNS('http://www.w3.org/2000/svg','circle'); dot.setAttribute('cx',x(t)); dot.setAttribute('cy',y(q)); dot.setAttribute('r',2.4); dot.setAttribute('fill', a>0? 'var(--ok)': (a<0? 'var(--danger)':'#94a3b8')); simSVG.appendChild(dot);} 
+  const l1=document.createElementNS('http://www.w3.org/2000/svg','line'); l1.setAttribute('x1',x(0)); l1.setAttribute('x2',x(T-1)); l1.setAttribute('y1',y(1)); l1.setAttribute('y2',y(1)); l1.setAttribute('stroke','#94a3b8'); l1.setAttribute('stroke-dasharray','3 4'); simSVG.appendChild(l1);
+  const ls=document.createElementNS('http://www.w3.org/2000/svg','line'); ls.setAttribute('x1',x(0)); ls.setAttribute('x2',x(T-1)); ls.setAttribute('y1',y(s)); ls.setAttribute('y2',y(s)); ls.setAttribute('stroke','#94a3b8'); ls.setAttribute('stroke-dasharray','3 4'); simSVG.appendChild(ls);
+  shareInv.textContent=(cI/T*100).toFixed(1)+'%'; shareIna.textContent=(cN/T*100).toFixed(1)+'%'; shareDis.textContent=(cD/T*100).toFixed(1)+'%';
+}
+
+// ---- Bindings ----
+function updateAll(){ reflect(); simulateQ(); drawPolicy(); drawCosts(); drawDeriv(); drawValue(); }
+['input','change'].forEach(evt=>{ [sInput,phiInput,KInput,deltaInput,qbarInput,rhoqInput,sigmaqInput,TInput,normLInput].forEach(el=> el.addEventListener(evt, updateAll)); });
+
+document.getElementById('update_btn').addEventListener('click', updateAll);
+document.getElementById('simulate_btn').addEventListener('click', ()=>{ seedInput.value = (parseInt(seedInput.value||'0') + 1).toString(); updateAll(); });
+
+// ---- Smoke tests ----
+(function selfTest(){
+  console.assert(document.getElementById('sim_svg'), 'sim_svg missing');
+  console.assert(document.getElementById('policy_svg'), 'policy_svg missing');
+  console.assert(document.getElementById('costs_svg'), 'costs_svg missing');
+  console.assert(document.getElementById('deriv_svg'), 'deriv_svg missing');
+  console.assert(document.getElementById('value_svg'), 'value_svg missing');
+})();
+
+updateAll();
+</script>
+<!-- MathJax for crisp inline math (optional) -->
+<script>window.MathJax={tex:{inlineMath:[["$","$"],["\\(","\\)"]]},svg:{fontCache:'global'}};</script>
+<script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
+</body>
+</html>
